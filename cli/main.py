@@ -17,7 +17,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-COMMANDS = ("install", "check", "update", "remove", "info")
+COMMANDS = ("install", "check", "tunda", "update", "remove", "info")
 
 
 def _version() -> str:
@@ -46,7 +46,7 @@ def main() -> int:
     here = Path(__file__).resolve().parent
     target = here / "commands" / (args.command + ".py")
     cmd = [sys.executable, str(target)]
-    if args.command == "check":
+    if args.command in ("check", "tunda"):
         cmd += ["sayrhazi", "--project", args.project]
     else:
         cmd += ["--project", args.project]

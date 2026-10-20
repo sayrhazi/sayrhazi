@@ -16,7 +16,7 @@ journal `history/workflow-log.md`, mise à jour minimale de
 `engine/state.py --reconcile`). Ne boucle pas après verdict négatif, ne
 publie / supprime rien.
 
-Sans dépendance externe. Windows / macOS / Linux.
+Sans dépendance externe. Windows / Linux.
 
 Usage :
     python .opencode/watch-work.py [--once] [--check] [--timeout SEC] [--continue]

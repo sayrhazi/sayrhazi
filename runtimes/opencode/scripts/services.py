@@ -7,7 +7,7 @@ d'agents. Ce script les démarre en arrière-plan, vérifie leurs ports,
 capture leurs logs et signale un arrêt. Redémarrage jamais automatique :
 un arrêt peut être volontaire (toujours explicite via `restart`).
 
-Sans dépendance externe. Windows / macOS / Linux.
+Sans dépendance externe. Windows / Linux.
 
 Usage :
     python .opencode/services.py start --name frontend --cmd "yarn dev" --cwd frontend --port 5173 --url http://localhost:5173

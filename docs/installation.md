@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-L'installation nécessite uniquement un projet existant, Git est recommandé, et PowerShell sous Windows ou Bash sous Linux/macOS. Sayrhazi ne nécessite pas Docker. Docker n'est ajouté que si le projet applicatif en a besoin.
+L'installation nécessite uniquement un projet existant, Git est recommandé, et PowerShell sous Windows ou Bash sous Linux. Sayrhazi ne nécessite pas Docker. Docker n'est ajouté que si le projet applicatif en a besoin.
 
 ## Depuis n'importe quel projet (recommandé)
 
@@ -40,7 +40,7 @@ sayrhazi-tui C:\mon\projet            # n'importe où dans le terminal
 sayrhazi-tui . --once                 # une seule capture, puis sortie
 ```
 
-Sur Linux et macOS, le même binaire utilise `python3`. Un tableau de détail
+Sous Linux, le même binaire utilise `python3`. Un tableau de détail
 s'affiche sous le tableau et suit la ligne sélectionnée (flèches ou clic) : il
 précise le modèle, la fenêtre de contexte, le coût de session et la décomposition
 du contexte (`input`, `cache.read`, `cache.write`, `output`, `reasoning`). Cette
@@ -53,7 +53,7 @@ Deux façons de l'obtenir, parce qu'elles n'ont pas la même durée de vie :
 | Source | Durée de vie | Marche quand |
 |---|---|---|
 | `npm i -g sayrhazi` | durable | immédiatement, le binaire est sur le PATH |
-| profil (`Sayrhazi-Profile.ps1`) | la session du terminal | après rechargement du profil ou ouverture d'un nouveau terminal |
+| profil (`Sayrhazi-Profile.ps1` / `Sayrhazi-Profile.sh`) | la session du terminal | après rechargement du profil ou ouverture d'un nouveau terminal |
 
 Une fonction de profil n'existe que dans la session qui l'a définie : après une
 mise à jour du noyau qui ajoute une commande, cette commande reste introuvable
@@ -68,6 +68,42 @@ du terminal. Les flags après le chemin (`--once`, `--interval`, `--lines`) sont
 transmis au dashboard. Sur un projet absent ou sans `.opencode/watch-tui.py`,
 elle s'arrête sur un message explicite.
 
+## Référence des commandes `sayrhazi`
+
+Toutes les commandes s'utilisent sous la forme **`sayrhazi <commande>`** — cela
+fonctionne **identiquement** sur Windows (PowerShell) et Linux (bash), sans
+profil à sourcer.
+
+| Commande | Description | Alias |
+|---|---|---|
+| `sayrhazi` | Installe Sayrhazi dans le dossier courant (ou chemin donné) | `sayrhazi .` |
+| `sayrhazi install` | Installe explicitement | — |
+| `sayrhazi check` | Vérifie la configuration du projet (tunda) | `sayrhazi tunda` |
+| `sayrhazi tunda` | Alias de `check` | `sayrhazi check` |
+| `sayrhazi info` | Affiche version noyau, version projet, agents, rapports | — |
+| `sayrhazi update` | Met à jour le projet vers la version noyau | — |
+| `sayrhazi remove` | Supprime les fichiers noyau (simulation sans `--yes`) | — |
+| `sayrhazi --version` | Affiche la version du noyau | — |
+
+**Options communes** :
+
+| Option | Commandes concernées | Effet |
+|---|---|---|
+| `--project <chemin>` | `check`, `tunda`, `info`, `update`, `remove` | Projet cible (défaut : dossier courant) |
+| `--once` | `sayrhazi-tui` | Une seule capture puis sortie |
+| `--interval <sec>` | `sayrhazi-tui` | Intervalle de rafraîchissement (défaut 1s) |
+| `--lines <n>` | `sayrhazi-tui` | Nombre de lignes de log affichées |
+| `--yes` | `remove` | Supprime sans confirmation |
+| `--version` | `sayrhazi` | Affiche la version |
+
+**Règle d'or** : utilisez toujours **`sayrhazi <commande>`**. Cela fonctionne
+**identiquement sur Windows (PowerShell) et Linux (bash)**, sans profil à
+sourcer. Les formes `<cmd> sayrhazi` (ex. `tunda sayrhazi`, `check sayrhazi`,
+`info sayrhazi`) sont des fonctions de profil — elles nécessitent que le profil
+soit sourcé dans le terminal, et ne fonctionnent pas sur Linux pour `info` /
+`update` (conflit avec commandes système). Le binaire `sayrhazi` n'a aucune
+dépendance au profil.
+
 ## Depuis le dépôt Sayrhazi
 
 ```powershell
@@ -75,7 +111,7 @@ cd <clone>
 .\runtimes\opencode\scripts\Install-Sayrhazi.ps1 -ProjectPath "C:\chemin\vers\MonProjet"
 ```
 
-## Linux et macOS
+## Linux
 
 Le lanceur npm utilise `python3` hors Windows. Deux différences avec Windows méritent d'être connues, toutes deux rencontrées à l'usage :
 
