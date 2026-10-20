@@ -8,7 +8,7 @@ Usage :
     python cli/main.py remove [--project .] [--yes]
     python cli/main.py info [--project .]
 
-Sans commande : installe dans --project (comme la fonction de profil).
+Sans commande : installe dans --project.
 """
 from __future__ import annotations
 

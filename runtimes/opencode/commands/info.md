@@ -1,4 +1,4 @@
-# Commande `info sayrhazi` (fonction de profil PowerShell).
+# Commande `sayrhazi info` (binaire npm, indépendant du profil).
 
 Renseigne sans rien modifier (exit toujours 0) : version noyau, adaptateurs,
 version installée, statut `up-to-date` / `update-available` / `unknown`,

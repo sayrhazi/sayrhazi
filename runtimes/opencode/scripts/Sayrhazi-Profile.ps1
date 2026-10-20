@@ -121,19 +121,11 @@ function Sayrhazi {
         }
     }
     if ($sub -eq "check") { Sayrhazi-Check $path }
-    elseif ($sub -eq "tunda") { python "$env:SAYRHAZI_HOME\cli\commands\check.py" sayrhazi --project $path }
+    elseif ($sub -eq "tunda") { python "$env:SAYRHAZI_HOME\cli\main.py" tunda --project $path }
     elseif ($sub -eq "info") { python "$env:SAYRHAZI_HOME\cli\main.py" info --project $path }
     elseif ($sub -eq "update") { Sayrhazi-Update $path }
     elseif ($sub -eq "remove") {
-        param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Args)
-        $path = "."
-        $yes = $false
-        foreach ($a in $Args) {
-            if ($a -eq "--yes") { $yes = $true }
-            elseif ($a -eq "sayrhazi") { }
-            elseif ($path -eq ".") { $path = $a }
-            else { Write-Host "Usage: sayrhazi remove [chemin] [--yes]" -ForegroundColor Yellow; return }
-        }
+        $yes = $Args -contains "--yes"
         python "$env:SAYRHAZI_HOME\cli\main.py" remove --project $path
         if ($LASTEXITCODE -eq 3) { return }
         if ($LASTEXITCODE -ne 0) { return }
@@ -163,9 +155,3 @@ function Sayrhazi {
     }
 }
 
-# Alias court pour compatibilite (minuscules)
-function sayrhazi { Sayrhazi @Args }
-function update { param([string]$Sub = "sayrhazi", [string]$ProjectPath = "."); if ($Sub -ne "sayrhazi") { Write-Host "Usage: update sayrhazi" -ForegroundColor Yellow; return } Sayrhazi-Update $ProjectPath }
-function info { param([string]$Sub = "sayrhazi", [string]$ProjectPath = "."); if ($Sub -ne "sayrhazi") { Write-Host "Usage: info sayrhazi" -ForegroundColor Yellow; return } python "$env:SAYRHAZI_HOME\cli\main.py" info --project $ProjectPath }
-function tunda { param([string]$Sub = "sayrhazi", [string]$ProjectPath = "."); if ($Sub -ne "sayrhazi") { Write-Host "Usage: tunda sayrhazi" -ForegroundColor Yellow; return } python "$env:SAYRHAZI_HOME\cli\commands\check.py" $Sub --project $ProjectPath }
-function update { param([string]$Sub = "sayrhazi", [string]$ProjectPath = "."); if ($Sub -ne "sayrhazi") { Write-Host "Usage: update sayrhazi" -ForegroundColor Yellow; return } Sayrhazi-Update $ProjectPath }

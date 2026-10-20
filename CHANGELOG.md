@@ -1,3 +1,10 @@
+## 0.13.3 — 2026-10-20
+
+- `Sayrhazi-Profile.ps1` : la fonction `sayrhazi { Sayrhazi @Args }` est retirée (plus de `CallDepthOverflow` sur `sayrhazi --version`) ; `npm install -g sayrhazi` suffit désormais sans sourcer de profil, sous Windows comme Linux.
+- `engine/updater.py` : le `model:` personnalisé d’un agent n’est plus écrasé à l’update et est aussi propagé vers `~/.opencode/agent\` (d’où OpenCode lit le modèle au lancement).
+- `core/agents/*/agent.yaml` et `runtimes/opencode/agents/*.md` : le modèle par défaut `muse-spark-1.3-contributor-free` est remplacé par `longcat-2.5-preview-free` avec un commentaire pointant vers `.opencode/models.yaml`.
+- `bin/check-env.js` : le `postinstall` liste les commandes indépendantes du profil au lieu d’en proposer le sourçage.
+
 ## 0.13.2 — 2026-10-16
 
 - Documentation : le dashboard exige `textual`, absent d'une installation fraîche, installé via un venv pour ne pas heurter au Python système (Ubuntu 23.10+ applique PEP 668) ; `info` et `update` sont des commandes système sous Ubuntu, donc `info sayrhazi` répond « aucune entrée de menu » tant que le profil bash n'est pas sourcé — le binaire global n'a pas ce conflit. `docs/automation.md` : panneau de détail, et rappel que la sélection survit au rafraîchissement.

@@ -1,4 +1,4 @@
-# Commande `remove sayrhazi` (fonction de profil PowerShell).
+# Commande `sayrhazi remove` (binaire npm, indépendant du profil).
 
 Retrait prudent : simulation par défaut suivie d'une confirmation interactive
 (`tapez yes`) ; `remove sayrhazi --yes` sans demander (scripts).
