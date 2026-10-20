@@ -1,31 +1,37 @@
 # Registre des fenêtres de contexte (lecture seule, observé par le dashboard).
 #
 # Ceci est un relevé ponctuel, PAS un catalogue officiel. Les modèles listés
-# étaient accessibles via OpenCode au `verified_at` indiqué ; un fournisseur
+# étaient observés via OpenCode au `verified_at` indiqué ; un fournisseur
 # peut les retirer, les mettre derrière une formule payante ou en changer la
 # fenêtre du jour au lendemain (constaté : des modèles apparaissent et
 # disparaissent d'une semaine à l'autre). Une ligne ici ne dit rien de la
 # disponibilité future d'un modèle, ni de son prix : ne jamais en déduire
 # qu'un modèle est gratuit parce qu'il figure dans ce fichier.
 #
-# Pourquoi ce fichier existe quand même : OpenCode n'enregistre nulle part la
-# fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration), mais
-# son panneau Context en a besoin. Sayrhazi reproduit ce calcul ; sans limite
-# connue il n'affiche aucun pourcentage plutôt qu'un chiffre faux — les tokens
-# et le coût restent affichés.
+# Ce fichier est la référence à consulter pour savoir quels modèles ont
+# été observés comme disponibles (y compris gratuits) au moment du relevé.
+# Le dashboard y lit les fenêtres de contexte pour calculer le pourcentage
+# d'occupation ; sans entrée connue il affiche `n/d` plutôt qu'un chiffre
+# inventé (tokens et coût restent affichés).
 #
 # Clé = identifiant complet `provider/model` (jamais le seul nom : deux
 # fournisseurs peuvent proposer des variantes homonymes de limites
 # différentes).
 #
 # Entretien :
-#   * nouveau modèle (gratuit ou payant) -> ajouter son ID et son contexte ;
-#   * modèle payant -> l'ID se règle dans le frontmatter de la fiche de
-#     l'agent (`model:` dans `.opencode/agent/*.md`), ce qui permet d'affecter
-#     un modèle différent à chaque agent. Le watcher passe toujours ce modèle
-#     en `--model` : la fiche est la seule source de vérité.
-#   * fenêtre modifiée -> corriger la valeur et `verified_at` ;
-#   * modèle retiré -> la ligne peut rester (inertre) ou être supprimée.
+#   * nouveau modèle observé -> ajouter son ID, son contexte et sa source ;
+#   * fenêtre modifiée -> corriger `context_tokens` et `verified_at` ;
+#   * modèle retiré du catalogue OpenCode -> la ligne peut rester (inerte)
+#     ou être supprimée ; aucune suppression automatique n'est faite.
+#
+# Choix du modèle par agent :
+#   * Les agents livrés par le noyau n'ont plus de `model:` par défaut.
+#   * L'utilisateur choisit le modèle de chaque agent dans le frontmatter
+#     de `.opencode/agent/<agent>.md` (`model: provider/model`), ou via
+#     `sayrhazi.yaml`. Le watcher passe toujours ce modèle en `--model` :
+#     la fiche du projet est la seule source de vérité.
+#   * `core/runtime/models.yaml` n'écrase jamais le choix de l'utilisateur :
+#     il sert uniquement de référence pour les fenêtres de contexte.
 
 models:
   opencode/longcat-2.5-preview-free:

@@ -145,11 +145,65 @@ def main() -> int:
     for d in ("agent", "resume", "history", "features", "state", "backup"):
         (opencode / d).mkdir(parents=True, exist_ok=True)
 
+    def _read_model(path: Path) -> str | None:
+        """Lit la valeur de `model:` dans le frontmatter YAML en debut de fichier."""
+        try:
+            text = path.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            return None
+        m = re.search(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
+        if not m:
+            return None
+        for line in m.group(1).splitlines():
+            mm = re.match(r'^\s*model:\s*"?([^"]+)"?\s*$', line)
+            if mm:
+                return mm.group(1).strip()
+        return None
+
+    def _write_model(path: Path, model: str) -> None:
+        """Remplace ou ajoute la ligne `model:` dans le frontmatter YAML
+        sans altérer l'indentation ni ajouter de guillemets."""
+        text = path.read_text(encoding="utf-8", errors="replace")
+        m = re.search(r"(---\s*\n)(.*?)(\n---\s*\n)", text, re.DOTALL)
+        if not m:
+            return
+        head, body, tail = m.group(1), m.group(2), m.group(3)
+        lines = body.splitlines()
+        replaced = False
+        for i, line in enumerate(lines):
+            mm = re.match(r'^(\s*model:\s*).+?\s*$', line)
+            if mm:
+                lines[i] = mm.group(1) + model
+                replaced = True
+                break
+        if not replaced:
+            lines.insert(0, 'model: ' + model)
+        path.write_text(head + "\n".join(lines) + tail + text[m.end():], encoding="utf-8")
+
     updated = 0
     adapter_agents = core / "runtimes" / "opencode" / "agents"
     for src in sorted(adapter_agents.glob("*.md")):
-        shutil.copy2(src, opencode / "agent" / src.name)
+        dst = opencode / "agent" / src.name
+        model = _read_model(dst) if dst.is_file() else None
+        shutil.copy2(src, dst)
+        if model:
+            _write_model(dst, model)
         updated += 1
+
+    # Propager aussi vers le dossier personnel OpenCode (~/.opencode/agent) :
+    # c'est là qu'OpenCode lit le `model:` de chaque agent au lancement,
+    # indépendamment de tout projet. Ainsi un changement de modèle se répercute
+    # sur toutes les sessions sans script à part.
+    home_agent_dir = Path.home() / ".opencode" / "agent"
+    if home_agent_dir.is_dir():
+        for src in sorted(adapter_agents.glob("*.md")):
+            dst = home_agent_dir / src.name
+            model = _read_model(dst) if dst.is_file() else None
+            shutil.copy2(src, dst)
+            if model:
+                _write_model(dst, model)
+            updated += 1
+
     watcher = core / "runtimes" / "opencode" / "scripts" / "watch-work.py"
     if watcher.is_file():
         shutil.copy2(watcher, opencode / "watch-work.py")

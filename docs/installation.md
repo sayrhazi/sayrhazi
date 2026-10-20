@@ -2,7 +2,7 @@
 
 ## Prérequis
 
-L'installation nécessite uniquement un projet existant, Git est recommandé, et PowerShell sous Windows ou Bash sous Linux/macOS. Sayrhazi ne nécessite pas Docker. Docker n'est ajouté que si le projet applicatif en a besoin.
+L'installation nécessite uniquement un projet existant, Git est recommandé, et PowerShell sous Windows ou Bash sous Linux. Sayrhazi ne nécessite pas Docker. Docker n'est ajouté que si le projet applicatif en a besoin.
 
 ## Depuis n'importe quel projet (recommandé)
 
@@ -24,13 +24,6 @@ Depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.git`), le sc
 & "<clone>\runtimes\opencode\scripts\Install-Sayrhazi.ps1" -ProjectPath "."
 ```
 
-Avec les fonctions de profil (sourcées depuis `Sayrhazi-Profile.ps1` du dépôt) :
-
-```powershell
-Sayrhazi .
-tunda sayrhazi
-```
-
 Le dashboard a aussi son raccourci, pour éviter d'avoir à se souvenir de
 `python .opencode/watch-tui.py` :
 
@@ -40,33 +33,56 @@ sayrhazi-tui C:\mon\projet            # n'importe où dans le terminal
 sayrhazi-tui . --once                 # une seule capture, puis sortie
 ```
 
-Sur Linux et macOS, le même binaire utilise `python3`. Un tableau de détail
-s'affiche sous le tableau et suit la ligne sélectionnée (flèches ou clic) : il
-précise le modèle, la fenêtre de contexte, le coût de session et la décomposition
+Sous Linux, le même binaire utilise `python3`. Un tableau de détail
+s'affiche sous le tableau et suit la ligne sélectionnée (flèches ou clic) :
+il précise le modèle, la fenêtre de contexte, le coût de session et la décomposition
 du contexte (`input`, `cache.read`, `cache.write`, `output`, `reasoning`). Cette
 dernière est la plus parlante — `cache.read` représente d'ordinaire l'essentiel
 du contexte renvoyé, donc une jauge à 55 % de fenêtre ne signifie pas que
 l'agent a produit 55 % de tokens.
 
-Deux façons de l'obtenir, parce qu'elles n'ont pas la même durée de vie :
+Le binaire est placé sur le `PATH` par `npm install -g sayrhazi` : il est
+disponible immédiatement et pour toujours, sans profil à sourcer. Le premier
+argument est le point de départ et la racine est cherchée en remontant jusqu'à
+`.opencode/watch-tui.py`, donc rester dans `.opencode` ou un sous-dossier marche
+aussi. Le dashboard résout sa racine depuis le répertoire courant : la commande
+change de dossier pour la durée du lancement puis revient, sans quoi
+`sayrhazi-tui <projet>` analyserait le projet du terminal. Les flags après le
+chemin (`--once`, `--interval`, `--lines`) sont transmis au dashboard. Sur un
+projet absent ou sans `.opencode/watch-tui.py`, elle s'arrête sur un message
+explicite.
 
-| Source | Durée de vie | Marche quand |
+## Référence des commandes `sayrhazi`
+
+Toutes les commandes s'utilisent sous la forme **`sayrhazi <commande>`** — cela
+fonctionne **identiquement** sur Windows (PowerShell) et Linux (bash), sans
+profil à sourcer.
+
+| Commande | Description | Alias |
 |---|---|---|
-| `npm i -g sayrhazi` | durable | immédiatement, le binaire est sur le PATH |
-| profil (`Sayrhazi-Profile.ps1`) | la session du terminal | après rechargement du profil ou ouverture d'un nouveau terminal |
+| `sayrhazi` | Installe Sayrhazi dans le dossier courant (ou chemin donné) | `sayrhazi .` |
+| `sayrhazi install` | Installe explicitement | — |
+| `sayrhazi check` | Vérifie la configuration du projet (tunda) | `sayrhazi tunda` |
+| `sayrhazi tunda` | Alias de `check` | `sayrhazi check` |
+| `sayrhazi info` | Affiche version noyau, version projet, agents, rapports | — |
+| `sayrhazi update` | Met à jour le projet vers la version noyau | — |
+| `sayrhazi remove` | Supprime les fichiers noyau (simulation sans `--yes`) | — |
+| `sayrhazi --version` | Affiche la version du noyau | — |
 
-Une fonction de profil n'existe que dans la session qui l'a définie : après une
-mise à jour du noyau qui ajoute une commande, cette commande reste introuvable
-jusqu'au rechargement. Préférez le binaire npm, qui n'a pas cette limite.
+**Options communes** :
 
-Dans les deux cas : le premier argument est le point de départ et la racine est
-cherchée en remontant jusqu'à `.opencode/watch-tui.py`, donc rester dans
-`.opencode` ou un sous-dossier marche aussi. Le dashboard résout sa racine
-depuis le répertoire courant : la commande change de dossier pour la durée du
-lancement puis revient, sans quoi `sayrhazi-tui <projet>` analyserait le projet
-du terminal. Les flags après le chemin (`--once`, `--interval`, `--lines`) sont
-transmis au dashboard. Sur un projet absent ou sans `.opencode/watch-tui.py`,
-elle s'arrête sur un message explicite.
+| Option | Commandes concernées | Effet |
+|---|---|---|
+| `--project <chemin>` | `check`, `tunda`, `info`, `update`, `remove` | Projet cible (défaut : dossier courant) |
+| `--once` | `sayrhazi-tui` | Une seule capture puis sortie |
+| `--interval <sec>` | `sayrhazi-tui` | Intervalle de rafraîchissement (défaut 1s) |
+| `--lines <n>` | `sayrhazi-tui` | Nombre de lignes de log affichées |
+| `--yes` | `remove` | Supprime sans confirmation |
+| `--version` | `sayrhazi` | Affiche la version |
+
+**Règle d'or** : utilisez toujours **`sayrhazi <commande>`**. Cela fonctionne
+**identiquement sur Windows (PowerShell) et Linux (bash)**, sans profil à
+sourcer. Le binaire `sayrhazi` n'a aucune dépendance au profil de terminal.
 
 ## Depuis le dépôt Sayrhazi
 
@@ -75,7 +91,7 @@ cd <clone>
 .\runtimes\opencode\scripts\Install-Sayrhazi.ps1 -ProjectPath "C:\chemin\vers\MonProjet"
 ```
 
-## Linux et macOS
+## Linux
 
 Le lanceur npm utilise `python3` hors Windows. Deux différences avec Windows méritent d'être connues, toutes deux rencontrées à l'usage :
 
@@ -97,14 +113,7 @@ chmod +x runtimes/opencode/scripts/install-sayrhazi.sh
 ./runtimes/opencode/scripts/install-sayrhazi.sh /chemin/vers/MonProjet
 ```
 
-Sous bash, les fonctions de profil (`Sayrhazi`, `tunda`, `update`, `info`, `remove`, `sayrhazi-tui`) se sourcent depuis `~/.bashrc` :
-
-```bash
-export SAYRHAZI_HOME="$(npm root -g)/sayrhazi"
-. "$SAYRHAZI_HOME/runtimes/opencode/scripts/Sayrhazi-Profile.sh"
-```
-
-**Attention aux collisions de noms.** Sur Ubuntu, `info` et `update` sont des commandes système (coreutils et `update-manager`) : tant que le profil n'est pas sourcé, `info sayrhazi` appelle le `info` de coreutils et répond « aucune entrée de menu ». Ce n'est pas une panne de Sayrhazi. Le binaire global `sayrhazi` et `sayrhazi-tui` n'ont pas ce conflit et sont préférables.
+Sous Linux, seules les commandes du binaire npm sont nécessaires (`sayrhazi`, `sayrhazi-tui`). Elles n'ont pas besoin d'être sourcées dans `~/.bashrc` et ne rencontrent pas de conflit avec les commandes système `info` ou `update`.
 
 ## Ce que fait l'installation
 
@@ -117,8 +126,8 @@ Les fichiers d'agents sont les fichiers fournis par Sayrhazi et peuvent être ac
 Compléter `.opencode/sayrhazi.yaml`, notamment `project.name`, les commandes réelles et les options de QA. Vérifier les règles locales dans `AGENTS.md` (§4), puis lancer le check depuis le projet :
 
 ```powershell
-tunda sayrhazi
-# ou sans alias : python "$env:SAYRHAZI_HOME/cli/commands/check.py" sayrhazi --project .
+sayrhazi tunda
+# ou sans alias : python cli/commands/check.py sayrhazi --project .
 ```
 
 Ouvrir ensuite OpenCode depuis la racine du projet utilisateur, pas depuis le dépôt Sayrhazi.
@@ -128,7 +137,7 @@ Ouvrir ensuite OpenCode depuis la racine du projet utilisateur, pas depuis le d�
 Quand le noyau évolue, mettre à jour depuis un projet déjà intégré :
 
 ```powershell
-update sayrhazi
+sayrhazi update
 # ou multi-plateforme : python cli/main.py update --project <projet>
 ```
 

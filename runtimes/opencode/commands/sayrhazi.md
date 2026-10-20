@@ -1,4 +1,4 @@
-# Commande `sayrhazi` (fonction de profil PowerShell).
+# Commande `sayrhazi` (binaire npm, indépendant du profil).
 
 Installe le workflow dans le projet courant (agents + watcher recopiés,
 `sayrhazi.yaml`/`opencode.json`/`AGENTS.md` créés si absents, état préservé),

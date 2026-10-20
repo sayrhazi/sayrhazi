@@ -2,7 +2,7 @@
 # Ce fichier décrit le projet courant ; il ne lance aucun service.
 workflow:
   name: Sayrhazi # Ne pas modifier
-  version: "0.13.2" # Ne pas modifier
+  version: "0.13.3" # Ne pas modifier
 
 project:
   name: A_COMPLETER # Renseigner le nom du projet

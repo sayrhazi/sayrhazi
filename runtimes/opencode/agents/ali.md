@@ -1,7 +1,8 @@
 ---
 description: Designer UI/UX Sayrhazi
 mode: primary
-model: opencode/muse-spark-1.3-contributor-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
+model: opencode/longcat-2.5-preview-free
 color: "#3B82F6"
 permission:
   playwright_*: allow

@@ -34,15 +34,5 @@ if (!check("git --version", "Git")) {
   console.log("[optionnel] Git — conseillé pour la lecture frugale (repli horodatages sinon)");
 }
 console.log(ok ? "sayrhazi : prêt." : "sayrhazi : installé, complétez les prérequis ci-dessus.");
-(function profileHint() {
-  const path = require("path");
-  const script = path.join(__dirname, "..", "runtimes", "opencode", "scripts", "Sayrhazi-Profile.ps1");
-  console.log("Fonctions terminal (Sayrhazi/tunda/update/info) : sourcez le profil versionné,");
-  if (process.platform === "win32") {
-    console.log('  . "' + script + '"');
-  } else {
-    const sh = path.join(__dirname, "..", "runtimes", "opencode", "scripts", "Sayrhazi-Profile.sh");
-    console.log("  export SAYRHAZI_HOME=$(npm root -g)/sayrhazi  # dans ~/.bashrc");
-    console.log('  . "' + sh + '"  # idem');
-  }
-})();
+console.log("Commandes (sans profil à sourcer) : sayrhazi, sayrhazi check, sayrhazi tunda,");
+console.log("sayrhazi info, sayrhazi update, sayrhazi remove, sayrhazi --version.");

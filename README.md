@@ -10,7 +10,7 @@
 ║    \___ \ / _` | | | | '__| '_ \ / _` |_  / | |   ║
 ║     ___) | (_| | |_| | |  | | | | (_| |/ /__| |   ║
 ║    |____/ \__,_|\__, |_|  |_| |_|\__,_/_____|_|   ║
-║                 |___/  v0.13.2 - sayrhazi         ║
+║                 |___/  v0.13.3 - sayrhazi         ║
 ║                                                   ║
 ╚═══════════════════════════════════════════════════╝
 ```
@@ -125,7 +125,7 @@ Chaque projet possède sa propre copie de `.opencode/agent/` (`sayrhazi.yaml`, `
 
 ## Installation dans un projet
 
-Prérequis : Python ≥ 3.10, Node.js LTS, `npm install -g opencode-ai` (tier gratuit, sans login manuel).
+Prérequis : Python ≥ 3.10, Node.js LTS.
 
 ```powershell
 npm install -g sayrhazi
@@ -137,28 +137,30 @@ Puis, depuis n'importe quel projet :
 sayrhazi .
 ```
 
+L'installation globale place le binaire `sayrhazi` (ou `sayrhazi.cmd` sous Windows) dans le `PATH` de npm. Aucun script de profil n'est à sourcer : les commandes `sayrhazi info`, `sayrhazi check`, `sayrhazi tunda`, `sayrhazi update`, `sayrhazi remove` et `sayrhazi --version` fonctionnent immédiatement.
+
 Sans npm, depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.git`) :
 
 ```powershell
 & "<clone>\runtimes\opencode\scripts\Install-Sayrhazi.ps1" -ProjectPath "."
 ```
 
-Avec les fonctions de profil : `Sayrhazi .` (installe + contrôle), `tunda sayrhazi` (check détaillé : structure, 6 agents, 0 `A_COMPLETER`, JSON valide, watcher, contrat des rapports signalé sans bloquer).
-
-Le script ne supprime ni ne remplace rapports, historiques, décisions ou configuration existants. Après installation, compléter `.opencode/sayrhazi.yaml`, renseigner les règles locales (`AGENTS.md` §4), puis vérifier avec `tunda sayrhazi`.
+Le script ne supprime ni ne remplace rapports, historiques, décisions ou configuration existants. Après installation, compléter `.opencode/sayrhazi.yaml`, renseigner les règles locales (`AGENTS.md` §4), puis vérifier avec `sayrhazi tunda`.
 
 ## Commandes
 
-Les crochets indiquent un argument optionnel : sans argument, la commande vise le dossier courant.
+Les crochets indiquent un argument optionnel : sans argument, la commande vise le dossier courant. Toutes s'invoquent comme `sayrhazi <commande>` et ne dépendent d'aucun profil de terminal.
 
 | Commande | Usage | Effet |
 |---|---|---|
 | `sayrhazi [chemin]` | installe + contrôle | Agents + watcher recopiés, config créée si absente, état préservé |
-| `tunda sayrhazi` | diagnostic | Checklist : structure, 6 agents, 0 `A_COMPLETER`, schéma, contrat des rapports + `workflow.yaml` (signalés, jamais bloquants), version vs noyau (exit 0/1/2) |
-| `update sayrhazi` | mise à jour | Agents + watcher, migration douce + backup, version alignée, check relancé |
-| `info sayrhazi` | renseigne | Banner + versions, agents, rapports (lecture seule) |
-| `sayrhazi-tui [chemin]` | dashboard | Lance `.opencode/watch-tui.py` sur le projet le plus proche (courant par défaut) ; `--once` pour une capture unique. Binaire npm sur le PATH, donc indépendant du profil de terminal |
-| `remove sayrhazi [--yes]` | retire prudemment | Simulation + confirmation ; fichiers noyau seuls, jamais config/rapports/historique |
+| `sayrhazi check [chemin]` | diagnostic rapide | Vérifie que Sayrhazi est initialisé dans le projet (agents, dossiers, config) |
+| `sayrhazi tunda [chemin]` | diagnostic détaillé | Checklist : structure, 6 agents, 0 `A_COMPLETER`, schéma, contrats des rapports + `workflow.yaml` (signalés, jamais bloquants), version vs noyau (exit 0/1/2) |
+| `sayrhazi update [chemin]` | mise à jour | Agents + watcher recopiés, migration douce + backup, version alignée, check relancé |
+| `sayrhazi info [chemin]` | renseigne | Banner + versions noyau/installé, agents présents, rapports (lecture seule) |
+| `sayrhazi remove [chemin] [--yes]` | retire prudemment | Simulation puis confirmation ; fichiers noyau seuls, jamais config/rapports/historique |
+| `sayrhazi-tui [chemin]` | dashboard | Lance `.opencode/watch-tui.py` sur le projet le plus proche (courant par défaut) ; `--once` pour une capture unique. Binaire npm sur le PATH, indépendant du profil de terminal |
+| `sayrhazi --version` | version | Affiche la version du noyau |
 
 ## Zawadi et Playwright (optionnel)
 
