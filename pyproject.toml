@@ -1,6 +1,6 @@
 [project]
 name = "sayrhazi"
-version = "0.13.3"
+version = "0.14.0"
 description = "Workflow multi-agents portable (moteur Python ; dashboard TUI en option via textual)"
 readme = "README.md"
 requires-python = ">=3.10"

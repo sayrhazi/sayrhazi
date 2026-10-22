@@ -27,11 +27,11 @@
     },
     "agents": {
       "type": "object",
-      "required": ["architect", "designer", "builder", "reviewer", "security", "qa"],
+      "required": ["architect", "builder-front", "builder-back", "reviewer", "security", "qa"],
       "properties": {
         "architect": {"type": "string", "minLength": 1},
-        "designer": {"type": "string", "minLength": 1},
-        "builder": {"type": "string", "minLength": 1},
+        "builder-front": {"type": "string", "minLength": 1},
+        "builder-back": {"type": "string", "minLength": 1},
         "reviewer": {"type": "string", "minLength": 1},
         "security": {"type": "string", "minLength": 1},
         "qa": {"type": "string", "minLength": 1}

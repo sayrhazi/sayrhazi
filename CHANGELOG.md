@@ -1,3 +1,14 @@
+## 0.14.0 — 2026-10-22
+
+- Flux frontend/backend/fullstack : scope de tâche (`frontend`, `backend`, `fullstack`) déclaré dans `plan.txt`, cohérent avec `agents_required` et les contrôles requis (`controls_required` / `controls` avec états `OK`, `KO`, `Non requis`, `En attente`).
+- Rapports `frontend.txt` (Ali) et `backend.txt` (Bamse) pour les scopes simples ; artefact partagé `fullstack.txt` avec sections non destructives pour le scope `fullstack` (Ali écrit sa section, puis Bamse écrit la sienne sans écraser l'autre).
+- Watcher verrouille l'étape backend tant que la section frontend de `fullstack.txt` n'est pas `TERMINÉ` ; rework ciblé et invalidation des verdicts périmés après modification de fichiers.
+- Archivage conditionnel et idempotent par Lawibrahim dans `history/fullstack-log.md` (clé d'unicité : `task_id`, une entrée cumulative par tâche, archivage seulement après OK global de tous les contrôles requis et verdict Hadji OK).
+- Migration des rôles système : `designer` → `build-front` (Ali) et `builder` → `build-back` (Bamse). Rétrocompatibilité lecture des anciens rapports via `ROLE_ALIASES` (`designer`/`builder` restent acceptés en entrée).
+- Instructions des six agents adaptées aux trois scopes, adaptateurs régénérés par `engine/renderer.py`.
+- `watch-tui.py`, `tunda`/`checker` et `engine/updater.py` mis à jour (scope, contrôles, archives, migration non destructive des projets existants).
+- Tests ajoutés : `TestScope`, `TestFullstack`, `TestFullstackWatcher`, `TestArchive`, `TestRework`, `TestFullstackFlow`.
+
 ## 0.13.3 — 2026-10-20
 
 - `Sayrhazi-Profile.ps1` : la fonction `sayrhazi { Sayrhazi @Args }` est retirée (plus de `CallDepthOverflow` sur `sayrhazi --version`) ; `npm install -g sayrhazi` suffit désormais sans sourcer de profil, sous Windows comme Linux.

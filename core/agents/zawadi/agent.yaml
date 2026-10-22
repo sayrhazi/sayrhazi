@@ -4,7 +4,7 @@ role: qa
 description: QA visuelle et fonctionnelle Sayrhazi
 mode: primary
 # Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
-model: opencode/longcat-2.5-preview-free
+model: opencode/nemotron-3.5-super-vl-free
 color: "#14B8A6"
 display_key: agents.qa
 permission:

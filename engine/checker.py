@@ -27,8 +27,8 @@ REQUIRED_CONFIG_KEYS = (
     "  name:",
     "agents:",
     "  architect:",
-    "  designer:",
-    "  builder:",
+    "  builder-front:",
+    "  builder-back:",
     "  reviewer:",
     "  security:",
     "  qa:",
@@ -145,10 +145,11 @@ def main() -> int:
     # Rapports (contrat Lot 1) : informatif seulement, ne change jamais le code de sortie.
     report_notes: list[str] = []
     try:
-        from report import parse_report, validate_report
+        from report import parse_report, validate_report, validate_task
+        from fullstack import read_fullstack, validate_fullstack
         resume_dir = opencode / "resume"
         if resume_dir.is_dir():
-            for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt"):
+            for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt"):
                 p = resume_dir / name
                 if not p.is_file():
                     continue
@@ -160,6 +161,17 @@ def main() -> int:
                     continue  # ancien rapport sans contrat : ignore
                 for violation in validate_report(rdata):
                     report_notes.append(f"rapport {name} : {violation}")
+                if name == "plan.txt" and "scope" in rdata:
+                    for violation in validate_task(rdata):
+                        report_notes.append(f"rapport {name} : {violation}")
+            p = resume_dir / "fullstack.txt"
+            if p.is_file():
+                try:
+                    headers, sections = read_fullstack(p)
+                    for violation in validate_fullstack(headers, sections):
+                        report_notes.append(f"rapport fullstack.txt : {violation}")
+                except OSError:
+                    pass
     except ImportError:
         pass
 

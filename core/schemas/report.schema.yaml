@@ -4,8 +4,8 @@
 # comme horodatage est refusé (confusion avec workflow.version).
 # Statuts par rôle (vérifiés par engine/report.py, espaces et underscores acceptés) :
 # architect (plan.txt) : À IMPLÉMENTER, INFORMATIF, VALIDÉ
-# designer (design.txt) : PROPOSÉ, VALIDÉ
-# builder (build.txt) : EN COURS, TERMINÉ, BLOQUÉ
+# build-front (frontend.txt) : PROPOSÉ, VALIDÉ
+# build-back (backend.txt) : EN COURS, TERMINÉ, BLOQUÉ
 # reviewer/security (review.txt, security.txt) : VALIDÉ, VALIDÉ AVEC RÉSERVES, CORRECTIONS NÉCESSAIRES
 # qa (qa.txt) : VALIDÉ, VALIDÉ AVEC RÉSERVES, CORRECTIONS NÉCESSAIRES, À COMPLÉTER
 # TERMINÉ décrit l'achèvement du travail, VALIDÉ décrit un verdict : ne pas les mélanger.

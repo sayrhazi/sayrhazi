@@ -47,16 +47,19 @@ DEBOUNCE_SECONDS = 2
 LOCK_STALE_SECONDS = 600
 
 # Rôle -> fichier agent OpenCode (noms stables) et rapport produit.
-ROLE_AGENT_FILE = {"architect": "lawibrahim", "designer": "ali",
-                   "builder": "bamse", "reviewer": "hadji",
-                   "security": "hifadhui", "qa": "zawadi"}
-ROLE_REPORT = {"architect": "plan.txt", "designer": "design.txt",
-               "builder": "build.txt", "reviewer": "review.txt",
-               "security": "security.txt", "qa": "qa.txt"}
-ROLE_STATUS_OK = {"builder": ("TERMINÉ",), "reviewer": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
+ROLE_AGENT_FILE = {"architect": "lawibrahim", "build-front": "ali",
+                   "build-back": "bamse", "reviewer": "hadji",
+                   "security": "hifadhui", "qa": "zawadi",
+                   "frontend": "ali", "backend": "bamse"}
+ROLE_REPORT = {"architect": "plan.txt", "build-front": "frontend.txt",
+               "build-back": "backend.txt", "reviewer": "review.txt",
+               "security": "security.txt", "qa": "qa.txt",
+               "frontend": "fullstack.txt", "backend": "fullstack.txt"}
+ROLE_STATUS_OK = {"build-back": ("TERMINÉ",), "reviewer": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
                   "security": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
                   "qa": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
-                  "designer": ("VALIDÉ",), "architect": ("VALIDÉ",)}
+                  "build-front": ("VALIDÉ",), "architect": ("VALIDÉ",),
+                  "frontend": ("TERMINÉ",), "backend": ("TERMINÉ",)}
 
 # Condition déclarée -> cle lue dans sayrhazi.yaml (section quality).
 # design_required n'a pas d'indicateur : Ali reste manuel (Lot 4).
@@ -64,19 +67,22 @@ CONDITION_KEYS = {"security_required": "security_audit_required_by_default",
                   "visual_qa_required": "visual_qa_required"}
 
 AGENT_PROMPTS = {
-    "builder": "Build Sayrhazi task {task} : lis .opencode/resume/plan.txt et produis build.txt",
-    "reviewer": "Review Sayrhazi task {task} : lis .opencode/resume/build.txt et produis review.txt",
-    "security": "Audit Sayrhazi task {task} : lis .opencode/resume/build.txt et produis security.txt",
-    "qa": "QA Sayrhazi task {task} : lis .opencode/resume/build.txt et produis qa.txt",
-    "designer": "Design Sayrhazi task {task} : lis .opencode/resume/plan.txt et produis design.txt",
+    "build-back": "Build Sayrhazi task {task} : lis .opencode/resume/plan.txt et produis backend.txt",
+    "reviewer": "Review Sayrhazi task {task} : lis .opencode/resume/backend.txt et produis review.txt",
+    "security": "Audit Sayrhazi task {task} : lis .opencode/resume/backend.txt et produis security.txt",
+    "qa": "QA Sayrhazi task {task} : lis .opencode/resume/backend.txt et produis qa.txt",
+    "build-front": "Design Sayrhazi task {task} : lis .opencode/resume/plan.txt et produis frontend.txt",
+    "frontend": "Frontend Sayrhazi task {task} : lis .opencode/resume/plan.txt, ecris uniquement ta section de .opencode/resume/fullstack.txt",
+    "backend": "Backend Sayrhazi task {task} : lis .opencode/resume/fullstack.txt (section frontend doit etre TERMINÉ), ecris uniquement ta section de .opencode/resume/fullstack.txt",
 }
 
 # Cloisonnement d'écriture entre agents concurrents : chaque agent ne
 # produit QUE son rapport (lire les autres est utile, les écrire est
 # interdit). L'archivage vers .opencode/history/ reste autorisé.
-OWN_REPORT = {"builder": "build.txt", "reviewer": "review.txt", "security": "security.txt",
-              "qa": "qa.txt", "designer": "design.txt"}
-ALL_REPORTS = ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt")
+OWN_REPORT = {"build-back": "backend.txt", "reviewer": "review.txt", "security": "security.txt",
+              "qa": "qa.txt", "build-front": "frontend.txt",
+              "frontend": "fullstack.txt", "backend": "fullstack.txt"}
+ALL_REPORTS = ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt", "fullstack.txt")
 
 
 def isolation_clause(agent: str) -> str:
@@ -88,6 +94,7 @@ def isolation_clause(agent: str) -> str:
 
 TASK_RE = re.compile(r"^\s*task_id\s*:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 STATUS_RE = re.compile(r"^\s*status\s*:\s*(\S.*?)\s*$", re.MULTILINE | re.IGNORECASE)
+SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) — (Ali|Bamse)$")
 
 
 def log(message: str) -> None:
@@ -454,12 +461,37 @@ def output_covers(output_file: Path, task_id: str, trigger_mtime: float) -> bool
     return task_id in text and mtime >= trigger_mtime
 
 
-def eligible_transitions(config: dict, triggers: dict, conditions: dict, outputs: dict) -> list:
+def fullstack_section_status(path: Path, section: str) -> str | None:
+    """Lit le stage_status d'une section de fullstack.txt.
+
+    Retourne le statut (ex. "TERMINÉ") ou None si la section est absente.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").lstrip("\ufeff")
+    except OSError:
+        return None
+    current = None
+    for raw in text.splitlines():
+        m = SECTION_HEADER_RE.match(raw.strip())
+        if m:
+            current = m.group(1)
+            continue
+        if current == section:
+            mm = re.match(r"^\s*stage_status\s*:\s*(\S.*)$", raw, re.IGNORECASE)
+            if mm:
+                return mm.group(1).strip().strip('"').strip("'")
+    return None
+
+
+def eligible_transitions(config: dict, triggers: dict, conditions: dict, outputs: dict,
+                         fullstack_sections: dict | None = None) -> list:
     """Étapes éligibles, sans effet de bord (testable).
 
     config : workflow parsé. triggers : {rapport: {task_id, status, mtime}}
     (rapports stables uniquement). conditions : {nom: bool}. outputs :
     {rapport: {task_id, mtime}} (rapports de sortie existants).
+    fullstack_sections : {nom_section: statut} optionnel, pour verrouiller
+    l'étape backend tant que la section frontend n'est pas TERMINÉ.
     Retourne [(stage, task_id, raison), ...] pour les stages auto: true.
     """
     eligible: list = []
@@ -485,6 +517,11 @@ def eligible_transitions(config: dict, triggers: dict, conditions: dict, outputs
         output_report = ROLE_REPORT.get(agent or "")
         if not output_report:
             continue
+        # Règle fullstack : l'étape backend ne démarre que si la section
+        # frontend de fullstack.txt est TERMINÉ.
+        if agent == "backend" and output_report == "fullstack.txt":
+            if fullstack_sections is None or fullstack_sections.get("frontend") != "TERMINÉ":
+                continue
         out = outputs.get(output_report)
         if out and out.get("task_id") == task_id and out.get("mtime", 0) >= current.get("mtime", 0):
             continue

@@ -3,7 +3,7 @@ input:
   required:
     - sayrhazi.yaml
     - AGENTS.md
-    - build.txt
+    - backend.txt
   optional:
     - captures
     - navigateur reel

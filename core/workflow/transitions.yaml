@@ -3,32 +3,32 @@
 transitions:
   - from: plan.txt
     status: À IMPLÉMENTER
-    to: builder
+    to: build-back
     auto: false
   - from: plan.txt
     status: À IMPLÉMENTER
     condition: design_required
-    to: designer
+    to: build-front
     auto: false
-  - from: design.txt
+  - from: frontend.txt
     status: VALIDÉ
-    to: builder
+    to: build-back
     auto: false
-  - from: build.txt
+  - from: backend.txt
     status: TERMINÉ
     to: reviewer
     auto: true
-  - from: build.txt
+  - from: backend.txt
     status: TERMINÉ
     condition: security_required
     to: security
     auto: false
-  - from: build.txt
+  - from: backend.txt
     status: TERMINÉ
     condition: visual_qa_required
     to: qa
     auto: false
   - from: review.txt
     status: CORRECTIONS NÉCESSAIRES
-    to: builder
+    to: build-back
     auto: false

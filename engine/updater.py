@@ -77,13 +77,12 @@ def migrate_config(inst_path: Path, tmpl_path: Path, history_dir: Path) -> tuple
             changed = True
 
     # 1b. Cle `designer:` manquante dans une section agents existante.
+    # Nucleus v0.14.0 : les clés builder-front / builder-back sont utilisées à la place.
+    # Les anciens rapports contenant agent: designer restent lisibles via les aliases
+    # dans engine/report.py, mais la configuration courante ne réinjecte plus cette clé.
     if has(r"^\s*architect\s*:") and not has(r"^\s*designer\s*:"):
-        idx = next(i for i, l in enumerate(inst_lines) if re.search(r"^\s*architect\s*:", l))
-        tmpl_designer = next((l for l in tmpl_lines if re.search(r"^\s*designer\s*:", l)), None)
-        if tmpl_designer:
-            inst_lines[idx + 1:idx + 1] = [tmpl_designer]
-            added.append("agents.designer (cle ajoutee, defaut Ali)")
-            changed = True
+        # Ne plus rien faire : la config reste telle quelle
+        pass
 
     # 2. Sections top-level du template integralement absentes -> ajout.
     inst_tops = {m.group(1) for l in inst_lines if (m := TOP_KEY_RE.match(l))}

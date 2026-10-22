@@ -3,7 +3,7 @@ id: visual_qa
 agent: qa
 condition: visual_qa_required
 requires:
-  - build.txt
+  - backend.txt
 produces:
   - qa.txt
 next:

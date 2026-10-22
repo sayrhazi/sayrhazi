@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-ROLES = ("architect", "designer", "builder", "reviewer", "security", "qa")
+ROLES = ("architect", "build-front", "build-back", "reviewer", "security", "qa", "frontend", "backend")
 
 TASK_STATUSES = ("À IMPLÉMENTER", "INFORMATIF", "EN COURS", "TERMINÉ", "BLOQUÉ", "VALIDÉ")
 
@@ -25,14 +25,18 @@ ROLE_STATUSES: dict[str, tuple[str, ...]] = {
     # plan.txt (Lawibrahim)
     "architect": ("À IMPLÉMENTER", "INFORMATIF", "VALIDÉ"),
     # design.txt (Ali)
-    "designer": ("PROPOSÉ", "VALIDÉ"),
+    "build-front": ("PROPOSÉ", "VALIDÉ"),
     # build.txt (Bamse)
-    "builder": ("EN COURS", "TERMINÉ", "BLOQUÉ"),
+    "build-back": ("EN COURS", "TERMINÉ", "BLOQUÉ"),
     # review.txt (Hadji), security.txt (Hifadhui)
     "reviewer": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES", "CORRECTIONS NÉCESSAIRES"),
     "security": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES", "CORRECTIONS NÉCESSAIRES"),
     # qa.txt (Zawadi)
     "qa": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES", "CORRECTIONS NÉCESSAIRES", "À COMPLÉTER"),
+    # frontend.txt (Ali)
+    "frontend": ("EN COURS", "TERMINÉ", "BLOQUÉ"),
+    # backend.txt (Bamse)
+    "backend": ("EN COURS", "TERMINÉ", "BLOQUÉ"),
 }
 
 REQUIRED_REPORT_FIELDS = ("task_id", "agent", "status", "completed_at", "summary")
@@ -46,8 +50,33 @@ ITEM_RE = re.compile(r"^\s*-\s+(.*)$")
 INDICATOR_ROLES = (
     ("security_required", "security"),
     ("visual_qa_required", "qa"),
-    ("design_required", "designer"),
+    ("design_required", "build-front"),
 )
+
+# Scope de tache -> roles attendus dans agents_required (Lot frontend/backend/fullstack).
+SCOPE_VALUES = ("frontend", "backend", "fullstack")
+SCOPE_REQUIRED_ROLES = {
+    "frontend": ("build-front",),
+    "backend": ("build-back",),
+    "fullstack": ("build-front", "build-back"),
+}
+
+# Rôles systeme canoniques et leurs alias pour retrocompatibilite lecture.
+# Les anciens rapports contenant agent: builder-front ou agent: builder-back restent lisibles.
+ROLE_ALIASES: dict[str, str] = {
+    "builder-front": "build-front",
+    "builder-back": "build-back",
+}
+
+
+def normalize_role(value: object) -> str:
+    """Normalise un role : remplace les anciens aliases par le canonique."""
+    text = str(value or "").strip().lower()
+    return ROLE_ALIASES.get(text, text)
+
+# Etats de controle (Lot 4) et noms de controles connus.
+CONTROL_STATES = ("OK", "KO", "Non requis", "En attente")
+CONTROL_NAMES = ("review", "security", "visual_qa", "integrated")
 
 
 def normalize_status(value: object) -> str:
@@ -137,7 +166,8 @@ def validate_report(data: dict) -> list[str]:
     task_id = data.get("task_id")
     if task_id and not TASK_ID_RE.match(str(task_id)):
         errors.append(f"task_id `{task_id}` instable (lettres/chiffres/._-, min 3 caracteres)")
-    agent = str(data.get("agent", "")).strip().lower()
+    agent_raw = str(data.get("agent", "")).strip().lower()
+    agent = normalize_role(agent_raw)
     if agent and agent not in ROLES:
         errors.append(f"agent `{data.get('agent')}` inconnu (attendu : {list(ROLES)})")
     status = data.get("status")
@@ -156,7 +186,7 @@ def validate_report(data: dict) -> list[str]:
     if next_agents:
         agents = next_agents if isinstance(next_agents, list) else [next_agents]
         for name in agents:
-            if str(name).strip().lower() not in ROLES:
+            if normalize_role(name) not in ROLES:
                 errors.append(f"next_agents `{name}` inconnu (attendu : {list(ROLES)})")
     return errors
 
@@ -176,12 +206,43 @@ def validate_task(data: dict) -> list[str]:
     required = data.get("agents_required")
     if required is not None:
         agents = required if isinstance(required, list) else [required]
+        agents_norm = [normalize_role(a) for a in agents]
         for name in agents:
-            if str(name).strip().lower() not in ROLES:
+            if normalize_role(name) not in ROLES:
                 errors.append(f"agents_required `{name}` inconnu (attendu : {list(ROLES)})")
         for indicator, role in INDICATOR_ROLES:
-            if data.get(indicator) is True and role not in [str(a).strip().lower() for a in agents]:
+            if data.get(indicator) is True and role not in agents_norm:
                 errors.append(f"{indicator}: true exige `{role}` dans agents_required")
+    scope = data.get("scope")
+    if scope is not None:
+        if str(scope).strip() not in SCOPE_VALUES:
+            errors.append(f"scope `{scope}` invalide (attendu : {list(SCOPE_VALUES)})")
+        else:
+            required = SCOPE_REQUIRED_ROLES.get(str(scope).strip(), ())
+            for role in required:
+                if role not in agents_norm:
+                    errors.append(f"scope `{scope}` exige `{role}` dans agents_required")
+    controls = data.get("controls")
+    if controls is not None:
+        if not isinstance(controls, dict):
+            errors.append("controls doit etre un mapping nom_controle -> etat")
+        else:
+            for name, etat in controls.items():
+                if str(etat).strip() not in CONTROL_STATES:
+                    errors.append(f"controle {name}: etat `{etat}` invalide (attendu : {list(CONTROL_STATES)})")
+    controls_required = data.get("controls_required")
+    if controls_required is not None:
+        required_list = controls_required if isinstance(controls_required, list) else [controls_required]
+        for name in required_list:
+            name = str(name).strip()
+            if name not in CONTROL_NAMES:
+                errors.append(f"controle requis `{name}` inconnu (attendu : {list(CONTROL_NAMES)})")
+            else:
+                etat = (controls or {}).get(name)
+                if etat is None or str(etat).strip() == "En attente":
+                    errors.append(f"controle requis `{name}` est en attente (n'est pas encore OK)")
+                elif str(etat).strip() == "Non requis":
+                    errors.append(f"controle requis `{name}` ne peut pas etre marque 'Non requis'")
     return errors
 
 

@@ -27,7 +27,7 @@ try:
 except ImportError:
     HAS_SCHEMA_CHECK = False
 try:
-    from report import parse_report, validate_report
+    from report import parse_report, validate_report, validate_task
     HAS_REPORT_CHECK = True
 except ImportError:
     HAS_REPORT_CHECK = False
@@ -41,10 +41,20 @@ try:
     HAS_STATE_CHECK = True
 except ImportError:
     HAS_STATE_CHECK = False
+try:
+    from fullstack import read_fullstack, validate_fullstack
+    HAS_FULLSTACK_CHECK = True
+except ImportError:
+    HAS_FULLSTACK_CHECK = False
+try:
+    from archive import validate_archive_conditions, is_archived, archive_entries
+    HAS_ARCHIVE_CHECK = True
+except ImportError:
+    HAS_ARCHIVE_CHECK = False
 
 REQUIRED_AGENTS = ("ali.md", "bamse.md", "hadji.md", "hifadhui.md", "lawibrahim.md", "zawadi.md")
 REQUIRED_DIRS = ("agent", "resume", "history", "features")
-REQUIRED_CONFIG_KEYS = ("workflow:", "  name: Sayrhazi", "project:", "  name:", "agents:", "  designer:", "technical:", "commands:", "quality:")
+REQUIRED_CONFIG_KEYS = ("workflow:", "  name: Sayrhazi", "project:", "  name:", "agents:", "  builder-front:", "  builder-back:", "technical:", "commands:", "quality:")
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*(#.*)?$', re.MULTILINE)
 
 
@@ -242,7 +252,8 @@ def main() -> int:
     if HAS_REPORT_CHECK:
         checked = 0
         bad = 0
-        for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt"):
+        for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt",
+                     "frontend.txt", "backend.txt"):
             p = opencode / "resume" / name
             if not p.is_file():
                 continue
@@ -257,8 +268,25 @@ def main() -> int:
             for v in validate_report(rdata):
                 warn(f"rapport {name} : {v}")
                 bad += 1
+            if name == "plan.txt" and "scope" in rdata:
+                for v in validate_task(rdata):
+                    warn(f"rapport {name} : {v}")
+                    bad += 1
         if checked and not bad:
             ok(f"rapports conformes ({checked})")
+
+    # 8b. artefact partage fullstack.txt (Lot 3)
+    if HAS_FULLSTACK_CHECK:
+        p = opencode / "resume" / "fullstack.txt"
+        if p.is_file():
+            try:
+                headers, sections = read_fullstack(p)
+                for v in validate_fullstack(headers, sections):
+                    warn(f"rapport fullstack.txt : {v}")
+            except OSError as exc:
+                warn(f"rapport fullstack.txt illisible: {exc}")
+        else:
+            pass  # pleinement optionnel, uniquement pour scope fullstack
 
     # 10. état (Lot 3 : informatif seulement, jamais bloquant)
     if HAS_STATE_CHECK:
@@ -278,6 +306,14 @@ def main() -> int:
                     warn(f"état : {v}")
                 if not violations:
                     ok(f"état tâche {current['workflow']['task_id']} : {current['workflow']['status']}")
+
+    # 8c. etat d'archivage fullstack (Lot 6 : informatif seulement)
+    if HAS_ARCHIVE_CHECK:
+        archived = archive_entries(root)
+        if archived:
+            ok(f"archives fullstack : {', '.join(archived)}")
+        else:
+            ok("aucune archive fullstack (attendue pour scope fullstack cloture)")
 
     # 9. workflow (contrat Lot 2 : informatif seulement, jamais bloquant)
     if HAS_WORKFLOW_CHECK:
