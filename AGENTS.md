@@ -20,13 +20,14 @@ Avant un commit :
 
 1. exécuter `python tests/test_core.py`, `python tests/test_integration.py` et `python tests/test_cli.py` ;
 
-1. exécuter `python engine/checker.py` sur une instance de test complète ;
-1. vérifier la syntaxe JSON avec un parseur JSON ;
-1. vérifier les scripts shell avec `bash -n` ;
-1. contrôler que les scripts d'installation ne suppriment jamais les rapports ni l'historique d'un projet ;
-1. rechercher les références spécifiques à un projet dans `core/` et `runtimes/`.
+2. exécuter `python engine/checker.py` sur une instance de test complète ;
+3. vérifier la syntaxe JSON avec un parseur JSON ;
+4. vérifier les scripts shell avec `bash -n` ;
+5. contrôler que les scripts d'installation ne suppriment jamais les rapports ni l'historique d'un projet ;
+6. rechercher les références spécifiques à un projet dans `core/` et `runtimes/`.
+7. Ne jamais faire un commit sans un accord explicite par le propriétaire.
 
 ## Versionnement
 
-- Lis le fichier `engine/bump_version.py` à chaque fois qu'une nouvelle version sera écrite dans le fichier `CHANGELOG.md` pour mettre à jours tous les fichiers concernés pour afficher la version.
-- Les commits suivent les Conventional Commits : `type(portée): objet` en minuscules, sans version dans le message. Types : `feat`, `fix`, `docs`, `test`, `refactor`, `chore`. Portées : `core`, `engine`, `cli`, `runtimes`, `docs`, `tests`, `watcher`. Exemple : `feat(watcher): moteur générique piloté par workflow.yaml`. Les versions vivent uniquement dans `VERSION`, `CHANGELOG.md`, les tags Git (`v0.1.0`) et les releases GitHub.
+1. Lis le fichier `engine/bump_version.py` à chaque fois qu'une nouvelle version sera écrite dans le fichier `CHANGELOG.md` pour mettre à jours tous les fichiers concernés pour afficher la version.
+2. Les commits suivent les Conventional Commits : `type(portée): objet` en minuscules, sans version dans le message. Types : `feat`, `fix`, `docs`, `test`, `refactor`, `chore`. Portées : `core`, `engine`, `cli`, `runtimes`, `docs`, `tests`, `watcher`. Exemple : `feat(watcher): moteur générique piloté par workflow.yaml`. Les versions vivent uniquement dans `VERSION`, `CHANGELOG.md`, les tags Git (`v0.1.0`) et les releases GitHub.

@@ -19,4 +19,7 @@ task:
     security_required: {type: boolean, optional: true}
     visual_qa_required: {type: boolean, optional: true}
     design_required: {type: boolean, optional: true}
+    scope: {type: string, enum: [frontend, backend, fullstack], optional: true}
+    controls_required: {type: list, items: string, optional: true}
+    controls: {type: object, optional: true}
     acceptance_criteria: {type: list, items: string, optional: true}

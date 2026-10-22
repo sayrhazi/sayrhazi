@@ -33,11 +33,13 @@ build terminé + security_required → Hifadhui
 build terminé + visual_qa_required → Zawadi
 plan validé + design_required → Ali
 review avec corrections → retour vers Bamse
+plan validé + scope:fullstack → Ali (section frontend de fullstack.txt)
+section frontend TERMINÉ + scope:fullstack → Bamse (section backend de fullstack.txt)
 ```
 
 Restent toujours humains : décision finale Lawibrahim/utilisateur, lancement d'une tâche importante en mode supervisé, changement de périmètre ou de critères d'acceptation, déploiement, migration ou suppression de données, correction à solutions multiples, blocage ou incohérence non déterministe.
 
-Une première automatisation raisonnable consiste à surveiller `build.txt` et à lancer Hadji lorsque Bamse a produit un rapport complet. Le script doit vérifier un statut explicite et un identifiant de tâche ; une simple modification de fichier ne suffit pas.
+Une première automatisation raisonnable consiste à surveiller `backend.txt` et à lancer Hadji lorsque Bamse a produit un rapport complet. Le script doit vérifier un statut explicite et un identifiant de tâche ; une simple modification de fichier ne suffit pas.
 
 ## Workflow prescrit vs transitions automatiques
 
@@ -48,12 +50,12 @@ WORKFLOW PRESCRIT (conceptuel, à orchestration humaine) :
 Lawibrahim → Ali → Bamse → Hadji → Hifadhui → Zawadi → Terminé
 
 TRANSITIONS AUTOMATIQUES ACTUELLES (réel, watch-work.py) :
-build.txt TERMINÉ + task_id → Hadji → vérifier review.txt
+backend.txt TERMINÉ + task_id → Hadji → vérifier review.txt
 ```
 
-Seule la transition `build.txt → Hadji` est automatisée. Hifadhui, Zawadi et le retour vers Bamse restent déclenchés manuellement : le moteur n'empêche pas toutes les transitions invalides, ce sont les contrats documentaires (rapports, statuts, `task_id`) qui les cadrent.
+Seule la transition `backend.txt → Hadji` est automatisée. Hifadhui, Zawadi et le retour vers Bamse restent déclenchés manuellement : le moteur n'empêche pas toutes les transitions invalides, ce sont les contrats documentaires (rapports, statuts, `task_id`) qui les cadrent.
 
-## État persistant et reprise (Lot 3)
+## État persistant et reprise
 
 Les terminaux ne sont pas la mémoire du workflow : `.opencode/state/workflow-state.yaml` est la vue de coordination (`task_id`, statut, étapes `current/completed/pending/blocked`, agents en cours). Les rapports restent les preuves détaillées. Le dossier `.opencode/state/` est local : à ignorer par git (reprise mono-poste, pas de bruit).
 
@@ -63,15 +65,15 @@ Au redémarrage (ou à tout moment), réconcilier avant de reprendre :
 python engine/state.py --reconcile --project .
 ```
 
-La réconciliation lit l'état, relit `workflow.yaml`, vérifie les rapports du `task_id` actif, ne retient que les étapes éligibles, ne relance jamais une étape terminée (sauf retour `CORRECTIONS NÉCESSAIRES` ou `qa.txt À COMPLÉTER` vers l'implémentation) et signale toute incohérence au lieu de la deviner. `tunda sayrhazi` contrôle la présence et la validité de l'état sans bloquer. Depuis le Lot 4, le watcher lit la config et met à jour l'état minimal + le journal (la réconciliation complète reste `engine/state.py --reconcile`).
+La réconciliation lit l'état, relit `workflow.yaml`, vérifie les rapports du `task_id` actif, ne retient que les étapes éligibles, ne relance jamais une étape terminée (sauf retour `CORRECTIONS NÉCESSAIRES` ou `qa.txt À COMPLÉTER` vers l'implémentation) et signale toute incohérence au lieu de la deviner. `tunda sayrhazi` contrôle la présence et la validité de l'état sans bloquer. Le watcher lit la config et met à jour l'état minimal + le journal (la réconciliation complète reste `engine/state.py --reconcile`).
 
 ## Moteur (`runtimes/opencode/scripts/watch-work.py`, installé dans `.opencode/`)
 
-Le watcher est devenu un moteur piloté par `.opencode/workflow.yaml` : pour chaque étape `auto: true`, il vérifie rapport stable, `task_id` + statut autorisés, condition satisfaite et sortie non existante, puis appelle l'agent du rôle (prompt, minuteur, durée, vérification du rapport produit). Verrou d'instance unique, anti-double en mémoire + sortie existante (point 7), journal `history/workflow-log.md`, mise à jour minimale de `state/workflow-state.yaml`. Sans `workflow.yaml` valide, repli sur la transition historique `build.txt TERMINÉ → Hadji`, sans jamais planter.
+Le watcher est devenu un moteur piloté par `.opencode/workflow.yaml` : pour chaque étape `auto: true`, il vérifie rapport stable, `task_id` + statut autorisés, condition satisfaite et sortie non existante, puis appelle l'agent du rôle (prompt, minuteur, durée, vérification du rapport produit). Verrou d'instance unique, anti-double en mémoire + sortie existante (point 7), journal `history/workflow-log.md`, mise à jour minimale de `state/workflow-state.yaml`. Sans `workflow.yaml` valide, repli sur la transition historique `backend.txt TERMINÉ → Hadji`, sans jamais planter.
 
-Les conditions se résolvent depuis `sayrhazi.yaml` (`visual_qa_required` → Zawadi, `security_audit_required_by_default` → Hifadhui ; `design_required` sans indicateur : Ali reste manuel). Sont automatiques : `review` (toujours), `security` et `visual_qa` (si requis), `rework` (retour vers Bamse sur `CORRECTIONS NÉCESSAIRES`, sauf `build.txt` plus récent), `rework_qa` (retour vers Bamse sur `qa.txt À COMPLÉTER` : Zawadi attend une action — purge cache, relance frontal, fix env — puis recontrôle). Étapes inconnues ou cassées : signalées et ignorées, jamais devinées. `tunda sayrhazi` affiche les agents requis, manuels et inactifs de la configuration.
+Les conditions se résolvent depuis `sayrhazi.yaml` (`visual_qa_required` → Zawadi, `security_audit_required_by_default` → Hifadhui ; `design_required` sans indicateur : Ali reste manuel). Sont automatiques : `review` (toujours), `security` et `visual_qa` (si requis), `rework` (retour vers Bamse sur `CORRECTIONS NÉCESSAIRES`, sauf `backend.txt` plus récent), `rework_qa` (retour vers Bamse sur `qa.txt À COMPLÉTER` : Zawadi attend une action — purge cache, relance frontal, fix env — puis recontrôle). Pour les tâches `fullstack`, l'étape `backend` est verrouillée tant que la section `frontend` de `fullstack.txt` n'est pas `TERMINÉ` : Bamse ne démarre pas avant qu'Ali n'ait terminé sa partie. Étapes inconnues ou cassées : signalées et ignorées, jamais devinées. `tunda sayrhazi` affiche les agents requis, manuels et inactifs de la configuration.
 
-Les étapes éligibles ensemble partent en parallèle (Lot 6, threads stdlib), bornées par `workflow.max_parallel_agents` (défaut 3, garde-fou machine). La convergence est journalisée (`Convergence : review OK, security OK (2/2)`) : un échec (timeout, erreur) n'empêche jamais les autres branches, qui écrivent chacune leur rapport ; la branche échouée sera réévaluée au prochain changement. `running_agents` reflète l'ensemble en cours. Séquentiel si une seule étape éligible, repli historique sinon.
+Les étapes éligibles ensemble partent en parallèle (threads stdlib), bornées par `workflow.max_parallel_agents` (défaut 3, garde-fou machine). La convergence est journalisée (`Convergence : review OK, security OK (2/2)`) : un échec (timeout, erreur) n'empêche jamais les autres branches, qui écrivent chacune leur rapport ; la branche échouée sera réévaluée au prochain changement. `running_agents` reflète l'ensemble en cours. Séquentiel si une seule étape éligible, repli historique sinon.
 
 ## Sessions : une par appel, OpenCode responsable
 
@@ -152,11 +154,52 @@ Un Ctrl+C au repos écrit un marqueur d'arrêt propre (`.opencode/state/clean_st
 
 La console colore les mots importants (agents, `task_id`, pourcentages, `ERREUR`/`ATTENTION`) et affiche le modèle de chaque agent appelé (`[muse-spark-1.3]`, lu dans le frontmatter de `.opencode/agent/*.md`) ; le journal fichier reste en texte brut, avec le nom complet du modèle. Pour la lisibilité, chaque vague de déclenchements est encadrée (`########## vague : … ##########`) et la sortie de chaque agent est encadrée (`============ AGENT · … ============` … `============ FIN · … ============`).
 
-## Services séparés (Lot 7)
+## Services séparés
 
 Les agents produisent des rapports ; les serveurs (`yarn dev` × 2) sont des processus persistants du projet, gérés par `runtimes/opencode/scripts/services.py` (installé dans `.opencode/`, jamais mélangé au moteur) : `start` (refusé si port occupé), `stop` (arbre complet), `status`, `logs`, `restart` explicite uniquement. Santé vérifiée par HTTP, logs vers `history/services-<nom>.log`, PID dans `state/`. Redémarrage jamais automatique : un arrêt peut être volontaire. Les agents utilisent `runtime.local_url` tel quel et ne (re)démarrent ni ne tuent jamais un serveur : un serveur absent est une limite signalée, pas une action.
 
 Modes utiles : `--check` (valide la config sans surveiller), `--once` (une seule vérification, exit `0` si déclenché), `--timeout SEC`.
+
+## Rework ciblé et invalidation des verdicts
+
+Dès qu'un fichier examiné par un contrôle est modifié, le verdict associé
+devient périmé (`En attente`) jusqu'à sa nouvelle exécution. Les contrôles
+non affectés conservent leur état.
+
+Le rework est routé vers l'agent responsable du périmètre :
+- contrôle `review` (qualité globale) -> Lawibrahim (architect)
+- contrôle `security` (sécurité backend) -> Bamse (build-back)
+- contrôle `visual_qa` (rendu frontend) -> Ali (build-front)
+- contrôle `integrated` (parcours complet) -> Lawibrahim (architect)
+
+Outil : `engine/rework.py` (`invalidate_controls`, `rework_role`, `controls_to_replay`, `is_rework_needed`).
+Les périmètres de fichiers par contrôle sont definis dans `CONTROL_SCOPES` et surchargeables par projet.
+
+## Instructions des agents et scopes
+
+Les fiches agents (`core/agents/*/instructions.md`, régénérées dans `runtimes/opencode/agents/*.md` par `engine/renderer.py`) ont été adaptées aux trois scopes :
+
+* **Lawibrahim (architect)** : déclare `scope` (`frontend`/`backend`/`fullstack`), `agents_required` cohérent, `controls_required` et `controls` (états `OK`/`KO`/`Non requis`/`En attente`) dans `plan.txt`.
+* **Ali (build-front)** : scope `frontend` → écrit `frontend.txt` ; scope `fullstack` → met à jour uniquement la section frontend de `fullstack.txt`, jamais celle de Bamse. Rapport `agent: frontend` (identité OpenCode `agent: build-front`, alias `designer` pour retrocompatibilite).
+* **Bamse (build-back)** : scope `backend` → écrit `backend.txt` ; scope `fullstack` → démarre uniquement si la section frontend d'Ali est `TERMINÉ`, met à jour uniquement sa section backend. Rapport `agent: backend` (identité OpenCode `agent: build-back`, alias `builder` pour retrocompatibilite).
+* **Hadji (reviewer)** : rend le verdict qualité final (`VALIDÉ` / `VALIDÉ AVEC RÉSERVES` / `CORRECTIONS NÉCESSAIRES`). En `fullstack`, examine `fullstack.txt` après que les deux sections sont `TERMINÉ`.
+* **Hifadhui (security)** : audite le backend si requis ; son verdict KO bloque la clôture et l'archivage.
+* **Zawadi (qa)** : teste après Ali (frontal testable) et/ou après Bamse (parcours intégré) selon le plan ; verdict `À COMPLÉTER` si le rendu n'est pas observable.
+
+## Archivage fullstack
+
+Une tâche `fullstack` est archivée par Lawibrahim uniquement après OK global :
+- les etapes frontend et backend sont terminees ;
+- tous les controles requis declares sont OK ;
+- le verdict final de Hadji est OK.
+
+L'ecriture se fait dans `.opencode/history/fullstack-log.md` (cumulatif, une entree par `task_id`).
+L'archivage est idempotent : le `task_id` sert de cle d'unicité, aucune entree dupliquee n'est ajoutee
+meme si le watcher redemarre. La reinitialisation de l'artefact courant `fullstack.txt` n'intervient
+qu'apres verification que l'archive est complete et enregistrée.
+
+Outil : `engine/archive.py` (`archive_fullstack`, `is_archived`, `validate_archive_conditions`).
+`tunda`/`checker` signalent les violations sans bloquer.
 
 ## Limites connues
 
@@ -169,7 +212,7 @@ Les problèmes déjà rencontrés concernent les permissions en mode headless, l
 Commencer par une seule transition :
 
 ```text
-build.txt : TERMINÉ → lancer Hadji → vérifier review.txt
+backend.txt : TERMINÉ → lancer Hadji → vérifier review.txt
 ```
 
 Ne pas lancer automatiquement Bamse, ne pas boucler automatiquement après une review négative et ne pas publier, supprimer ou modifier des éléments sensibles. Les corrections, conflits de rapports et clôtures importantes restent sous contrôle humain.

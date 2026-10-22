@@ -1,0 +1,11 @@
+# Etape : interface frontend (Ali), si composante visuelle.
+id: buildfront
+agent: build-front
+condition: design_required
+requires:
+  - plan.txt
+produces:
+  - frontend.txt
+next:
+  success: buildback
+  failure: buildfront

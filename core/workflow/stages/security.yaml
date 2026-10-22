@@ -3,7 +3,7 @@ id: security
 agent: security
 condition: security_required
 requires:
-  - build.txt
+  - backend.txt
 produces:
   - security.txt
 next:

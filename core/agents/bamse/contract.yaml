@@ -5,10 +5,10 @@ input:
     - AGENTS.md
     - plan.txt
   optional:
-    - design.txt
+    - frontend.txt
     - rapports de correction
 output:
-  report: build.txt
+  report: backend.txt
   contains:
     - task_id
     - agent
@@ -29,5 +29,5 @@ output:
 permissions:
   code: write
 rules:
-  - suit design.txt sans re-maquetter
+  - suit frontend.txt sans re-maquetter
   - signale audit Hifadhui sur zones sensibles

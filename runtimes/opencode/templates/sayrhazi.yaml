@@ -2,7 +2,7 @@
 # Ce fichier décrit le projet courant ; il ne lance aucun service.
 workflow:
   name: Sayrhazi # Ne pas modifier
-  version: "0.13.3" # Ne pas modifier
+  version: "0.14.0" # Ne pas modifier
 
 project:
   name: A_COMPLETER # Renseigner le nom du projet
@@ -13,8 +13,8 @@ agents:
   # Noms d'affichage des agents, modifiables librement par projet.
   # Les fichiers agent/*.md et les roles restent stables : seul le nom presente change.
   architect: Lawibrahim
-  designer: Ali
-  builder: Bamse
+  builder-front: Ali
+  builder-back: Bamse
   reviewer: Hadji
   security: Hifadhui
   qa: Zawadi

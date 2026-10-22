@@ -16,13 +16,16 @@ try:
 except ImportError:  # pragma: no cover
     parse_simple_yaml = None  # type: ignore
 try:
-    from report import normalize_status, parse_report, validate_report
+    from report import normalize_status, normalize_role, parse_report, validate_report
     HAS_REPORTS = True
 except ImportError:  # pragma: no cover
     HAS_REPORTS = False
 
     def normalize_status(value) -> str:  # type: ignore
         return str(value).strip().upper().replace("_", " ")
+
+    def normalize_role(value) -> str:  # type: ignore
+        return str(value).strip().lower()
 try:
     from workflow import parse_workflow
     HAS_WORKFLOW = True
@@ -34,25 +37,25 @@ STATUSES = ("PENDING", "READY", "RUNNING", "IN_PROGRESS", "TERMINÉ",
             "BLOCKED", "FAILED", "CANCELLED")
 
 # Étape -> rapport qui prouve son achèvement (Lot 3, réconciliation).
-STAGE_REPORTS = {"planning": "plan.txt", "design": "design.txt",
-                 "implementation": "build.txt", "review": "review.txt",
+STAGE_REPORTS = {"planning": "plan.txt", "design": "frontend.txt",
+                 "implementation": "backend.txt", "review": "review.txt",
                  "security": "security.txt", "visual_qa": "qa.txt"}
 
 # Rapport déclencheur par défaut (surchargé par workflow.yaml si présent).
 DEFAULT_TRIGGERS = {"planning": None, "design": "plan.txt",
-                    "implementation": "plan.txt", "review": "build.txt",
-                    "security": "build.txt", "visual_qa": "build.txt"}
+                    "implementation": "plan.txt", "review": "backend.txt",
+                    "security": "backend.txt", "visual_qa": "backend.txt"}
 
 # Statuts qui achèvent l'étape (le reste = non terminé ; CORRECTIONS et
-# qa.txt À COMPLÉTER rouvrent builder).
-FINAL_STATUSES = {"architect": ("VALIDÉ",), "designer": ("VALIDÉ",),
-                  "builder": ("TERMINÉ",),
+# qa.txt À COMPLÉTER rouvrent build-back).
+FINAL_STATUSES = {"architect": ("VALIDÉ",), "build-front": ("VALIDÉ",),
+                  "build-back": ("TERMINÉ",),
                   "reviewer": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
                   "security": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES"),
                   "qa": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES")}
 
-REPORT_ROLES = {"plan.txt": "architect", "design.txt": "designer",
-                "build.txt": "builder", "review.txt": "reviewer",
+REPORT_ROLES = {"plan.txt": "architect", "frontend.txt": "build-front",
+                "backend.txt": "build-back", "review.txt": "reviewer",
                 "security.txt": "security", "qa.txt": "qa"}
 
 
@@ -236,7 +239,7 @@ def reconcile(project_root: Path | str, task_id: str | None = None) -> tuple[dic
     completed: list[str] = []
     pending: list[str] = []
     blocked: list[str] = []
-    build_ok = "build.txt" in valid
+    build_ok = "build.txt" in valid or "backend.txt" in valid
     for sid in stages:
         rep = STAGE_REPORTS.get(sid)
         data = valid.get(rep) if rep else None

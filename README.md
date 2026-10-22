@@ -10,7 +10,7 @@
 ║    \___ \ / _` | | | | '__| '_ \ / _` |_  / | |   ║
 ║     ___) | (_| | |_| | |  | | | | (_| |/ /__| |   ║
 ║    |____/ \__,_|\__, |_|  |_| |_|\__,_/_____|_|   ║
-║                 |___/  v0.13.3 - sayrhazi         ║
+║                 |___/  v0.14.0 - sayrhazi         ║
 ║                                                   ║
 ╚═══════════════════════════════════════════════════╝
 ```
@@ -30,33 +30,19 @@
 ```mermaid
 flowchart TD
     User["Utilisateur"] <-->|discussion itérative| Lawibrahim["Lawibrahim<br/>Discussion & architecture"]
-    Lawibrahim -->|décision validée| plan[(".opencode/resume/plan.txt")]
-    plan --> Bamse["Bamse<br/>Squelette si vide,<br/>puis implémente"]
-    plan -->|si visuel, structure prête| Ali["Ali<br/>Maquette UI/UX"]
-    Bamse -->|squelette posé, si visuel| Ali
-    Ali --> design[(".opencode/resume/design.txt")]
-    design --> Bamse
-    Bamse --> build[(".opencode/resume/build.txt")]
-    build -.->|archive| buildlog[(".opencode/history/build-log.md")]
-    build -->|auto via watch-work.py si TERMINÉ + task_id| Hadji["Hadji<br/>Qualité / archi / régressions"]
-    build -.->|si zones à risque, manuel| Hifadhui["Hifadhui<br/>Sécurité approfondie"]
-    Hadji --> review[(".opencode/resume/review.txt")]
-    Hifadhui --> security[(".opencode/resume/security.txt")]
-    review -.->|archive| reviewlog[(".opencode/history/review-log.md")]
-    security -.->|archive| securitylog[(".opencode/history/security-log.md")]
-    review --> V1{Verdict Hadji}
-    security --> V2{Verdict Hifadhui}
-    V1 -->|CORRECTIONS NÉCESSAIRES| Bamse
-    V2 -->|CORRECTIONS NÉCESSAIRES| Bamse
-    V1 -->|VALIDÉ / VALIDÉ AVEC RÉSERVES| Zawadi["Zawadi<br/>QA visuel & fonctionnel"]
-    V2 -->|VALIDÉ / VALIDÉ AVEC RÉSERVES| Zawadi
-    Zawadi --> qa[(".opencode/resume/qa.txt")]
-    qa -.->|archive| qalog[(".opencode/history/qa-log.md")]
-    qa --> V3{Verdict Zawadi}
-    V3 -->|CORRECTIONS NÉCESSAIRES| Bamse
-    V3 -->|À COMPLÉTER| Attente["Complément requis<br/>navigateur / captures"]
-    V3 -->|VALIDÉ / VALIDÉ AVEC RÉSERVES| Fin["Terminé"]
-    Fin -->|Lawibrahim archive| features[".opencode/features/<nom>.md"]
+    Lawibrahim -->|classe scope + contrat| plan[(".opencode/resume/plan.txt")]
+    plan -->|scope: frontend| AliF["Ali<br/>Interface frontend"]
+    plan -->|scope: backend| BamseB["Bamse<br/>Backend / serveur"]
+    plan -->|scope: fullstack| AliFS["Ali<br/>Section frontend d'abord"]
+    AliFS -->|section frontend TERMINÉ| BamseFS["Bamse<br/>Section backend ensuite"]
+    AliF --> frontend[(".opencode/resume/frontend.txt")]
+    BamseB --> backend[(".opencode/resume/backend.txt")]
+    AliFS & BamseFS --> fullstack[(".opencode/resume/fullstack.txt")]
+    fullstack --> contrôles["Contrôles requis<br/>(Zawadi, Hifadhui, Hadji)"]
+    contrôles -->|KO| rework["Rework ciblé<br/>(agent responsable)"]
+    contrôles -->|OK global| Hadji["Hadji<br/>Verdict qualité final"]
+    Hadji -->|OK| LawibrahimA["Lawibrahim<br/>Archivage idempotent"]
+    LawibrahimA -->|task_id unique| features[(".opencode/features/<nom>.md")]
 ```
 
 Tous les agents respectent les règles communes (`AGENTS.md` du projet) : lire `.opencode/sayrhazi.yaml` comme seule source de vérité, ne jamais supposer le nom du projet, se présenter avec nom + type + stack (ouverture ou demande uniquement), répondre en français avec typographie correcte, emojis proscrits dans le travail.
@@ -65,14 +51,14 @@ Tous les agents respectent les règles communes (`AGENTS.md` du projet) : lire `
 
 | Agent | Fichier | Rôle | Modèle | Couleur |
 |---|---|---|---|---|
-| **Lawibrahim** | `agent/lawibrahim.md` | Partenaire de réflexion — discute architecture et fonctionnalités avant qu'une tâche soit lancée. N'implémente et ne review jamais. | `muse-spark-1.3` | `#8B5CF6` |
-| **Ali** | `agent/ali.md` | Designer UI/UX — maquettes, écrans, composants, responsive, thèmes. Crée la structure visuelle neuve, ne touche ni à l'existant ni à la logique. | `muse-spark-1.3` (vision) | `#3B82F6` |
-| **Bamse** | `agent/bamse.md` | Développeur principal — implémente à partir de `plan.txt` et `design.txt`, vérifie, écrit `build.txt`. Seul à modifier le code existant et la logique. | `muse-spark-1.3` | `#22C55E` |
-| **Hadji** | `agent/hadji.md` | Reviewer qualité — bugs, régressions, architecture, performance. **Ne couvre pas la sécurité.** | `muse-spark-1.3` | `#F59E0B` |
-| **Hifadhui** | `agent/hifadhui.md` | Spécialiste sécurité — injections, auth/sessions, secrets, dépendances, contrôle d'accès. | `muse-spark-1.3` | `#EF4444` |
-| **Zawadi** | `agent/zawadi.md` | Testeuse QA visuelle et fonctionnelle — rendu réel, responsive, modes clair/sombre, parcours. Ne déduit jamais un rendu du seul code. | `muse-spark-1.3` (vision) | `#14B8A6` |
+| **Lawibrahim** | `agent/lawibrahim.md` | Partenaire de réflexion — clarifie le besoin, classe le scope (`frontend`, `backend`, `fullstack`), déclare les contrôles requis et le contrat d'échange. N'implémente et ne review jamais. Archive les features bouclées dans `.opencode/features/`. | `muse-spark-1.3` | `#8B5CF6` |
+| **Ali** | `agent/ali.md` | Interface frontend — maquettes, écrans, composants, responsive, thèmes. Écrit `frontend.txt` (scope `frontend`) ou sa section de `fullstack.txt` (scope `fullstack`, d'abord, avant Bamse). Ne touche ni à l'existant ni à la logique. | `muse-spark-1.3` (vision) | `#3B82F6` |
+| **Bamse** | `agent/bamse.md` | Backend et logique serveur — implémente à partir de `plan.txt`, vérifie, écrit `backend.txt` (scope `backend`) ou sa section de `fullstack.txt` (scope `fullstack`, après Ali seulement). Seul à modifier le code existant et la logique. | `muse-spark-1.3` | `#22C55E` |
+| **Hadji** | `agent/hadji.md` | Reviewer qualité — bugs, régressions, architecture, performance. Rend le verdict qualité final (`VALIDÉ` / `VALIDÉ AVEC RÉSERVES` / `CORRECTIONS NÉCESSAIRES`). **Ne couvre pas la sécurité.** | `muse-spark-1.3` | `#F59E0B` |
+| **Hifadhui** | `agent/hifadhui.md` | Spécialiste sécurité — injections, auth/sessions, secrets, dépendances, contrôle d'accès. Son verdict KO bloque la clôture et l'archivage. | `muse-spark-1.3` | `#EF4444` |
+| **Zawadi** | `agent/zawadi.md` | Testeuse QA visuelle et fonctionnelle — rendu réel, responsive, modes clair/sombre, parcours. Teste après Ali (frontal) et/ou après Bamse (parcours intégré) selon le plan. Ne déduit jamais un rendu du seul code. | `muse-spark-1.3` (vision) | `#14B8A6` |
 
-Tous en `mode: primary` — on parle à un seul agent à la fois. Flux : `Lawibrahim → Ali → Bamse → Hadji` si visuel sur projet existant, `Lawibrahim → Bamse (squelette) → Ali → Bamse → Hadji` sur projet vierge, `Lawibrahim → Bamse → Hadji` sinon — avec Hifadhui sur les zones à risque et Zawadi sur le rendu observable. Les noms d'affichage sont modifiables par projet via `agents:` dans `sayrhazi.yaml` (fichiers et rôles stables).
+Tous en `mode: primary` — on parle à un seul agent à la fois. Flux par scope : `frontend` → Lawibrahim → Ali → Zawadi (si requis) → Hadji ; `backend` → Lawibrahim → Bamse → Hifadhui (si requis) → Zawadi (si requis) → Hadji ; `fullstack` → Lawibrahim → Ali (section frontend) → Bamse (section backend, après Ali TERMINÉ) → contrôles requis → Hadji (verdict final) → archivage par Lawibrahim après OK global. Hifadhui sur les zones à risque. Les noms d'affichage sont modifiables par projet via `agents:` dans `sayrhazi.yaml` (fichiers et rôles stables).
 
 ## Les fichiers de suivi
 
@@ -88,23 +74,27 @@ Chaque fichier est **remplacé** à chaque passage — il ne contient que le der
 | `review.txt` | Hadji | Bamse (si corrections), Zawadi |
 | `security.txt` | Hifadhui | Bamse (si corrections) |
 | `qa.txt` | Zawadi | Bamse (si corrections signalées) |
+| `frontend.txt` | Ali | Hadji, Zawadi |
+| `backend.txt` | Bamse | Hadji, Hifadhui, Zawadi |
+| `fullstack.txt` | Ali (section frontend), Bamse (section backend) | Hadji, Hifadhui, Zawadi |
 
 Chaque rapport contient : date système réelle, projet, tâche (`task_id:` stable, ex. `FEATURE-001`), auteur (`agent:`, rôle stable), horodatage (`completed_at:`, ISO 8601), résumé (`summary:`), `status:`, vérifications, problèmes classés `CRITIQUE / HAUTE / MOYENNE / FAIBLE`, limites, suite et verdict du rôle (`TERMINÉ` = achèvement, `VALIDÉ` = verdict). Aucun secret dans les rapports. Référence : `docs/reports.md`, validateur : `engine/report.py`.
 
 ### Historique (`.opencode/history/`)
 
-Avant de remplacer son fichier `resume/`, chaque agent archive l'ancien contenu ici : `build-log.md`, `design-log.md`, `review-log.md`, `security-log.md`, `qa-log.md`. `plan.txt` reste cumulatif jusqu'à l'archivage explicite d'une feature dans `.opencode/features/<nom>.md`.
+Avant de remplacer son fichier `resume/`, chaque agent archive l'ancien contenu ici : `build-log.md`, `design-log.md`, `review-log.md`, `security-log.md`, `qa-log.md`, `frontend-log.md`, `backend-log.md`. `plan.txt` reste cumulatif jusqu'à l'archivage explicite d'une feature dans `.opencode/features/<nom>.md`. L'artefact `fullstack.txt` est archivé dans `history/fullstack-log.md` (une entrée cumulative par `task_id`, après OK global uniquement).
+
+> Les fichiers `design.txt` et `build.txt` restent lisibles pour la rétrocompatibilité des projets installés avant la v0.14.0, mais ne sont plus les rapports standards des scopes `frontend`/`backend`/`fullstack`.
 
 ## Comment ça se déroule concrètement
 
-1. **Discussion** — avec Lawibrahim. Une fois d'accord, il note la décision dans `plan.txt` (`À IMPLÉMENTER`, `INFORMATIF`, puis `VALIDÉ` quand la décision est prise), uniquement après confirmation explicite.
-2. **Design** (si composante visuelle) — Ali maquette à partir de `plan.txt` et écrit `design.txt` (`PROPOSÉ` ou `VALIDÉ`).
-3. **Implémentation** — Bamse consulte `plan.txt` (et `design.txt` si visuel), code, vérifie, écrit `build.txt` (`EN COURS`, `TERMINÉ` ou `BLOQUÉ`).
-4. **Review qualité** — Hadji lit `build.txt`, inspecte le code, écrit `review.txt` (`VALIDÉ`, `VALIDÉ AVEC RÉSERVES` ou `CORRECTIONS NÉCESSAIRES`). Déclenchable auto via `watch-work.py` quand `build.txt` est `TERMINÉ` avec `task_id`.
-5. **Audit sécurité** (si pertinent) — Hifadhui audite et écrit `security.txt`.
-6. **QA** (une fois les reviews OK) — Zawadi teste en navigateur réel (Playwright si configuré, sinon captures) et écrit `qa.txt` (`VALIDÉ`, `VALIDÉ AVEC RÉSERVES`, `CORRECTIONS NÉCESSAIRES` ou `À COMPLÉTER`).
-7. **Corrections** — si un verdict l'exige, Bamse reprend. Le cycle repart de l'étape 3.
-8. **Terminé** — Lawibrahim archive la feature bouclée dans `.opencode/features/`.
+1. **Discussion** — avec Lawibrahim. Il classe la tâche par scope (`frontend`, `backend` ou `fullstack`), déclare les contrôles requis et le contrat d'échange dans `plan.txt` (`À IMPLÉMENTER`, `INFORMATIF`, puis `VALIDÉ` quand la décision est prise), uniquement après confirmation explicite.
+2. **Implémentation** — scope `frontend` : Ali écrit `frontend.txt` (`EN COURS`, `TERMINÉ` ou `BLOQUÉ`). Scope `backend` : Bamse écrit `backend.txt`. Scope `fullstack` : Ali écrit sa section de `fullstack.txt` **d'abord**, puis Bamse écrit sa section de `fullstack.txt` uniquement quand la section frontend est `TERMINÉ`.
+3. **Vérifications** — selon les contrôles déclarés dans le plan : Zawadi (QA frontend après Ali, QA intégré après Bamse si requis), Hifadhui (audit sécurité si requis), Hadji (review qualité globale).
+4. **Review qualité** — Hadji lit le rapport d'implémentation (`frontend.txt`, `backend.txt` ou `fullstack.txt` selon le scope), inspecte le code, écrit `review.txt` (`VALIDÉ`, `VALIDÉ AVEC RÉSERVES` ou `CORRECTIONS NÉCESSAIRES`). Déclenchable auto via `watch-work.py`.
+6. **Rework** — si un contrôle est KO, la correction revient à l'agent responsable (Ali pour le frontend, Bamse pour le backend, Lawibrahim pour le contrat d'échange). Les contrôles affectés sont rejoués.
+7. **Archivage** — lorsque tous les contrôles requis sont OK et que Hadji a rendu son verdict final OK, Lawibrahim archive l'artefact complet dans `history/fullstack-log.md` (scope `fullstack`) ou dans l'historique correspondant (scopes simples). L'archivage est idempotent (clé : `task_id`).
+8. **Terminé** — la tâche est clôturée et l'artefact courant peut être réinitialisé uniquement après vérification que l'archive est complète.
 
 ## Docker est-il nécessaire ?
 
@@ -186,7 +176,7 @@ Le `deny` global empêche les autres agents d'y accéder ; seuls `ali.md` (obser
 
 ## Automatisation
 
-Le cœur fonctionne manuellement ; `watch-work.py` (installé dans `.opencode/`) est un moteur piloté par `.opencode/workflow.yaml` : chaque étape `auto: true` déclenche l'agent du rôle si rapport, statut, condition et sortie le permettent (`review` toujours, `security`/`visual_qa` si requis, `rework` vers Bamse sur corrections ; Ali manuel). Les étapes éligibles ensemble partent en parallèle (bornées par `max_parallel_agents`), convergence journalisée, échec isolé. Les serveurs (`yarn dev`) vivent hors des agents via `services.py` (`start/stop/status/logs`) : les agents utilisent l'URL sans jamais la gérer. `tunda` affiche les agents requis par la configuration. Le reste du flux (Lawibrahim → Ali → Bamse → Hadji → Hifadhui → Zawadi) est prescrit mais orchestré par l'humain. Il refuse les rapports incomplets (contrat `task_id` + `agent` + `status` + `completed_at`, voir `docs/reports.md`), empêche les doubles déclenchements et applique un timeout. `tunda` signale les rapports non conformes sans bloquer. Pas de retour auto vers Bamse, pas de boucle après review négative : les décisions restent humaines.
+Le cœur fonctionne manuellement ; `watch-work.py` (installé dans `.opencode/`) est un moteur piloté par `.opencode/workflow.yaml` : chaque étape `auto: true` déclenche l'agent du rôle si rapport, statut, condition et sortie le permettent (`review` toujours, `security`/`visual_qa` si requis, `rework` vers Bamse sur corrections ; Ali manuel). Pour le scope `fullstack`, Bamse ne démarre que quand la section frontend d'Ali est `TERMINÉ`. Les étapes éligibles ensemble partent en parallèle (bornées par `max_parallel_agents`), convergence journalisée, échec isolé. Les serveurs (`yarn dev`) vivent hors des agents via `services.py` (`start/stop/status/logs`) : les agents utilisent l'URL sans jamais la gérer. `tunda` affiche les agents requis par la configuration. Le reste du flux est prescrit par scope mais orchestré par l'humain. Il refuse les rapports incomplets (contrat `task_id` + `agent` + `status` + `completed_at`, voir `docs/reports.md`), empêche les doubles déclenchements et applique un timeout. `tunda` signale les rapports non conformes sans bloquer. Pas de retour auto vers Bamse, pas de boucle après review négative : les décisions restent humaines.
 
 Limites connues : permissions en mode headless, fichiers créés hors projet (Bamse doit travailler dans le projet), sessions longues interrompues.
 

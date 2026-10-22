@@ -18,17 +18,18 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 try:
-    from report import ROLES, ROLE_STATUSES, normalize_status
+    from report import ROLES, ROLE_STATUSES, normalize_status, normalize_role
 except ImportError:  # pragma: no cover
-    ROLES = ("architect", "designer", "builder", "reviewer", "security", "qa")
+    ROLES = ("architect", "build-front", "build-back", "reviewer", "security", "qa")
     ROLE_STATUSES = {}
     normalize_status = str
+    normalize_role = str
 
 # Rapport -> role qui le produit (le trigger doit porter un statut de ce role).
 REPORT_PRODUCERS = {
     "plan.txt": "architect",
-    "design.txt": "designer",
-    "build.txt": "builder",
+    "frontend.txt": "build-front",
+    "backend.txt": "build-back",
     "review.txt": "reviewer",
     "security.txt": "security",
     "qa.txt": "qa",

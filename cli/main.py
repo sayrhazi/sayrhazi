@@ -46,16 +46,13 @@ def main() -> int:
     here = Path(__file__).resolve().parent
     target = here / "commands" / (args.command + ".py")
     cmd = [sys.executable, str(target)]
-    if args.command in ("check", "tunda"):
-        cmd += ["sayrhazi", "--project", args.project]
-    else:
-        cmd += ["--project", args.project]
+    cmd += ["--project", args.project]
     if args.command == "remove" and args.yes:
         cmd += ["--yes"]
     code = subprocess.run(cmd).returncode
     if bare and code == 0:
         check = [sys.executable, str(here / "commands" / "check.py"),
-                 "sayrhazi", "--project", args.project]
+                 "--project", args.project]
         code = subprocess.run(check).returncode
     return code
 

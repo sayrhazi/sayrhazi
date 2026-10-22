@@ -117,7 +117,7 @@ Sous Linux, seules les commandes du binaire npm sont nécessaires (`sayrhazi`, `
 
 ## Ce que fait l'installation
 
-Le script crée `.opencode/agent/`, `resume/`, `history/`, `features/`, `state/` et `backup/`, puis copie les six agents génériques, `watch-work.py` (orchestrateur), `watch-tui.py` (dashboard, lecture seule) et `models.yaml` (fenêtres de contexte connues), tous mis à jour à chaque install. `.opencode/state/` (`workflow-state.yaml`, vue de coordination du Lot 3) est local à la machine : ajoutez-le au `.gitignore` du projet (la config `workflow.yaml` se versionne, l'état non). Il crée `AGENTS.md`, `sayrhazi.yaml` et `opencode.json` uniquement lorsqu'ils sont absents. Il ne supprime ni ne remplace les rapports, historiques, décisions ou configuration déjà présents.
+Le script crée `.opencode/agent/`, `resume/`, `history/`, `features/`, `state/` et `backup/`, puis copie les six agents génériques, `watch-work.py` (orchestrateur), `watch-tui.py` (dashboard, lecture seule) et `models.yaml` (fenêtres de contexte connues), tous mis à jour à chaque install. `.opencode/state/` (`workflow-state.yaml`, vue de coordination) est local à la machine : ajoutez-le au `.gitignore` du projet (la config `workflow.yaml` se versionne, l'état non). Il crée `AGENTS.md`, `sayrhazi.yaml` et `opencode.json` uniquement lorsqu'ils sont absents. Il ne supprime ni ne remplace les rapports, historiques, décisions ou configuration déjà présents.
 
 Les fichiers d'agents sont les fichiers fournis par Sayrhazi et peuvent être actualisés par une future version. Pour un projet existant, effectuer un commit ou une sauvegarde avant toute mise à jour et relire les différences.
 

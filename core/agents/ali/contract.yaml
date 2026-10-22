@@ -8,7 +8,7 @@ input:
     - captures
     - rendu navigateur
 output:
-  report: design.txt
+  report: frontend.txt
   contains:
     - task_id
     - agent

@@ -2,7 +2,7 @@
 id: review
 agent: reviewer
 requires:
-  - build.txt
+  - backend.txt
 produces:
   - review.txt
 next:

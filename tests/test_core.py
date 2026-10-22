@@ -111,16 +111,16 @@ class TestReport(unittest.TestCase):
 
     def test_champs_requis(self):
         from report import parse_report, validate_report
-        rep = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\n")
+        rep = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\n")
         self.assertTrue(any("summary" in v for v in validate_report(rep)), validate_report(rep))
 
     def test_statut_par_role(self):
         from report import parse_report, validate_report
         ok_review = parse_report("task_id: FEATURE-001\nagent: reviewer\nstatus: VALIDÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: OK.\n")
         self.assertEqual(validate_report(ok_review), [])
-        bad_build = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: VALIDÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+        bad_build = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: VALIDÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
         self.assertTrue(any("status" in v for v in validate_report(bad_build)))
-        bad_qa = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: À COMPLÉTER\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+        bad_qa = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: À COMPLÉTER\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
         self.assertTrue(any("status" in v for v in validate_report(bad_qa)))
         ok_qa = parse_report("task_id: FEATURE-001\nagent: qa\nstatus: À COMPLÉTER\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: En attente.\n")
         self.assertEqual(validate_report(ok_qa), [])
@@ -129,12 +129,12 @@ class TestReport(unittest.TestCase):
 
     def test_version_horodatage_refusee(self):
         from report import parse_report, validate_report
-        rep = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: TERMINÉ\nversion: \"2026-09-23T19:30:00+04:00\"\nsummary: Fait.\n")
+        rep = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: TERMINÉ\nversion: \"2026-09-23T19:30:00+04:00\"\nsummary: Fait.\n")
         self.assertTrue(any("version" in v for v in validate_report(rep)))
 
     def test_bom_ignore(self):
         from report import parse_report, validate_report
-        rep = parse_report("\ufeff" + "task_id: FEATURE-001\nagent: builder\nstatus: TERMINÉ\n"
+        rep = parse_report("\ufeff" + "task_id: FEATURE-001\nagent: build-back\nstatus: TERMINÉ\n"
                            'completed_at: "2026-09-26T10:00:00+04:00"\nsummary: Fait.\n')
         self.assertEqual(rep.get("task_id"), "FEATURE-001")
         self.assertEqual(validate_report(rep), [])
@@ -142,31 +142,386 @@ class TestReport(unittest.TestCase):
     def test_task_id_formats(self):
         from report import parse_report, validate_report
         for tid in ("FEATURE-001", "MPANGO-2026-014"):
-            rep = parse_report(f"task_id: {tid}\nagent: builder\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+            rep = parse_report(f"task_id: {tid}\nagent: build-back\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
             self.assertEqual(validate_report(rep), [], tid)
         for tid in ("AB", "a b"):
-            rep = parse_report(f"task_id: {tid}\nagent: builder\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+            rep = parse_report(f"task_id: {tid}\nagent: build-back\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
             self.assertTrue(any("task_id" in v for v in validate_report(rep)), tid)
 
     def test_coherence_indicateurs(self):
         from report import parse_report, validate_task
-        incoherent = parse_report("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\nagents_required: [builder, reviewer]\nsecurity_required: true\n")
+        incoherent = parse_report("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\nagents_required: [build-back, reviewer]\nsecurity_required: true\n")
         self.assertTrue(any("security" in v for v in validate_task(incoherent)))
-        coherent = parse_report("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\nagents_required: [builder, reviewer, security]\nsecurity_required: true\n")
+        coherent = parse_report("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\nagents_required: [build-back, reviewer, security]\nsecurity_required: true\n")
         self.assertEqual(validate_task(coherent), [])
 
     def test_transition(self):
         from report import check_transition, parse_report
-        rep = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
-        self.assertEqual(check_transition(rep, expected_agent="builder", expected_task_id="FEATURE-001",
+        rep = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+        self.assertEqual(check_transition(rep, expected_agent="build-back", expected_task_id="FEATURE-001",
                                           output_text="review FEATURE-001 ok"), [])
-        self.assertTrue(check_transition(rep, expected_agent="builder", expected_task_id="FEATURE-002"))
+        self.assertTrue(check_transition(rep, expected_agent="build-back", expected_task_id="FEATURE-002"))
         self.assertTrue(check_transition(rep, expected_agent="reviewer", expected_task_id="FEATURE-001"))
-        stale = parse_report("task_id: FEATURE-001\nagent: builder\nstatus: EN COURS\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: WIP.\n")
-        self.assertTrue(check_transition(stale, expected_agent="builder", expected_task_id="FEATURE-001",
+        stale = parse_report("task_id: FEATURE-001\nagent: build-back\nstatus: EN COURS\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: WIP.\n")
+        self.assertTrue(check_transition(stale, expected_agent="build-back", expected_task_id="FEATURE-001",
                                          allowed_statuses=("TERMINÉ",)))
-        self.assertTrue(check_transition(rep, expected_agent="builder", expected_task_id="FEATURE-001",
+        self.assertTrue(check_transition(rep, expected_agent="build-back", expected_task_id="FEATURE-001",
                                          output_text="review sans identifiant"))
+
+
+class TestScope(unittest.TestCase):
+    def _task(self, **fields):
+        from report import parse_report
+        base = ("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\n"
+                'completed_at: "2026-09-26T10:00:00+04:00"\nsummary: Fait.\n')
+        for key, value in fields.items():
+            base += f"{key}: {value}\n"
+        return parse_report(base)
+
+    def test_scope_valide_frontend(self):
+        from report import validate_task
+        rep = self._task(scope="frontend", agents_required="[build-front]")
+        self.assertEqual(validate_task(rep), [], validate_task(rep))
+
+    def test_scope_valide_backend(self):
+        from report import validate_task
+        rep = self._task(scope="backend", agents_required="[build-back]")
+        self.assertEqual(validate_task(rep), [], validate_task(rep))
+
+    def test_scope_valide_fullstack(self):
+        from report import validate_task
+        rep = self._task(scope="fullstack", agents_required="[build-front, build-back]")
+        self.assertEqual(validate_task(rep), [], validate_task(rep))
+
+    def test_scope_invalide(self):
+        from report import validate_task
+        rep = self._task(scope="mobile", agents_required="[build-back]")
+        self.assertTrue(any("scope" in v for v in validate_task(rep)), validate_task(rep))
+
+    def test_scope_absent_sans_erreur(self):
+        from report import validate_task
+        rep = self._task(agents_required="[build-back]")
+        self.assertEqual(validate_task(rep), [], validate_task(rep))
+
+    def test_scope_frontend_exige_designer(self):
+        from report import validate_task
+        rep = self._task(scope="frontend", agents_required="[build-back]")
+        self.assertTrue(any("build-front" in v for v in validate_task(rep)), validate_task(rep))
+
+    def test_scope_backend_exige_builder(self):
+        from report import validate_task
+        rep = self._task(scope="backend", agents_required="[build-front]")
+        self.assertTrue(any("build-back" in v for v in validate_task(rep)), validate_task(rep))
+
+    def test_scope_fullstack_exige_designer_et_builder(self):
+        from report import validate_task
+        rep = self._task(scope="fullstack", agents_required="[build-front]")
+        erreurs = validate_task(rep)
+        self.assertTrue(any("build-back" in v for v in erreurs), erreurs)
+
+    def _base_task(self, **extra):
+        from report import parse_report
+        base = ("task_id: FEATURE-001\ntitle: T\nstatus: À IMPLÉMENTER\n"
+                'completed_at: "2026-09-26T10:00:00+04:00"\nsummary: Fait.\n')
+        for key, value in extra.items():
+            base += f"{key}: {value}\n"
+        return parse_report(base)
+
+    def test_controle_etat_valide(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls": {"review": "OK", "security": "En attente", "visual_qa": "Non requis", "integrated": "KO"}}
+        self.assertEqual(validate_task(data), [], validate_task(data))
+
+    def test_controle_etat_invalide(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls": {"review": "peut-etre"}}
+        self.assertTrue(any("etat" in v for v in validate_task(data)), validate_task(data))
+
+    def test_controle_requis_en_attente_refuse(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls_required": ["review"],
+                "controls": {"review": "En attente"}}
+        self.assertTrue(any("requis" in v and "attente" in v for v in validate_task(data)), validate_task(data))
+
+    def test_controle_requis_non_requis_refuse(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls_required": ["security"],
+                "controls": {"security": "Non requis"}}
+        self.assertTrue(any("Non requis" in v for v in validate_task(data)), validate_task(data))
+
+    def test_controle_requis_ok_valide(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls_required": ["review"],
+                "controls": {"review": "OK"}}
+        self.assertEqual(validate_task(data), [], validate_task(data))
+
+    def test_controle_inconnu_refuse(self):
+        from report import validate_task
+        data = {"task_id": "F-1", "title": "T", "status": "À IMPLÉMENTER",
+                "completed_at": "2026-09-26T10:00:00+04:00", "summary": "Fait.",
+                "controls_required": ["performance"]}
+        self.assertTrue(any("inconnu" in v for v in validate_task(data)), validate_task(data))
+
+
+class TestFullstackWatcher(unittest.TestCase):
+    def _watcher(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "watch_work_fs", str(ROOT / "runtimes" / "opencode" / "scripts" / "watch-work.py"))
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_fullstack_section_status_frontend_termine(self):
+        w = self._watcher()
+        import tempfile
+        from pathlib import Path as _P
+        with tempfile.TemporaryDirectory() as tmp:
+            p = _P(tmp) / "fullstack.txt"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text(
+                "task_id: F-1\nscope: fullstack\nstatus: EN COURS\n\n"
+                "## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
+                "## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n",
+                encoding="utf-8")
+            self.assertEqual(w.fullstack_section_status(p, "frontend"), "TERMINÉ")
+            self.assertEqual(w.fullstack_section_status(p, "backend"), "EN COURS")
+
+    def test_fullstack_section_status_absent(self):
+        w = self._watcher()
+        import tempfile
+        from pathlib import Path as _P
+        with tempfile.TemporaryDirectory() as tmp:
+            p = _P(tmp) / "fullstack.txt"
+            p.parent.mkdir(parents=True, exist_ok=True)
+            p.write_text("task_id: F-1\nscope: fullstack\nstatus: EN COURS\n", encoding="utf-8")
+            self.assertIsNone(w.fullstack_section_status(p, "frontend"))
+
+    def test_eligible_backend_bloque_si_frontend_pas_termine(self):
+        w = self._watcher()
+        cfg = {"stages": [
+            {"id": "backend", "agent": "backend", "auto": True,
+             "trigger": {"report": "fullstack.txt", "status": "TERMINÉ"}}
+        ]}
+        triggers = {"fullstack.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0}}
+        outputs = {}
+        self.assertEqual(w.eligible_transitions(cfg, triggers, {}, outputs, {}), [])
+        fs = {"frontend": "TERMINÉ"}
+        got = w.eligible_transitions(cfg, triggers, {}, outputs, fs)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0][1], "F-1")
+
+    def test_eligible_backend_bloque_si_frontend_en_cours(self):
+        w = self._watcher()
+        cfg = {"stages": [
+            {"id": "backend", "agent": "backend", "auto": True,
+             "trigger": {"report": "fullstack.txt", "status": "TERMINÉ"}}
+        ]}
+        triggers = {"fullstack.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0}}
+        outputs = {}
+        fs = {"frontend": "EN COURS"}
+        self.assertEqual(w.eligible_transitions(cfg, triggers, {}, outputs, fs), [])
+
+
+class TestArchive(unittest.TestCase):
+    def _project(self, fullstack_content=None):
+        import tempfile
+        tmp = tempfile.mkdtemp()
+        resume = Path(tmp) / ".opencode" / "resume"
+        resume.mkdir(parents=True)
+        history = Path(tmp) / ".opencode" / "history"
+        history.mkdir(parents=True)
+        if fullstack_content is not None:
+            (resume / "fullstack.txt").write_text(fullstack_content, encoding="utf-8")
+        self.addCleanup(__import__("shutil").rmtree, tmp, True)
+        return tmp
+
+    def test_archive_creates_entry(self):
+        from archive import archive_fullstack, is_archived, archive_entries
+        tmp = self._project(
+            "task_id: FEATURE-012\nscope: fullstack\nstatus: TERMINÉ\n\n"
+            "## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
+            "## Étape backend — Bamse\nagent: backend\nstage_status: TERMINÉ\nsummary: API faite.\n")
+        ok, msg = archive_fullstack(tmp, "FEATURE-012",
+                                    controls={"review": "OK", "security": "OK"},
+                                    hadji_verdict="OK")
+        self.assertTrue(ok, msg)
+        self.assertTrue(is_archived(tmp, "FEATURE-012"))
+        self.assertIn("FEATURE-012", archive_entries(tmp))
+
+    def test_archive_idempotent(self):
+        from archive import archive_fullstack, archive_entries
+        tmp = self._project("task_id: FEATURE-012\nscope: fullstack\nstatus: TERMINÉ\n")
+        archive_fullstack(tmp, "FEATURE-012", controls={"review": "OK"}, hadji_verdict="OK")
+        n1 = len(archive_entries(tmp))
+        archive_fullstack(tmp, "FEATURE-012", controls={"review": "OK"}, hadji_verdict="OK")
+        n2 = len(archive_entries(tmp))
+        self.assertEqual(n1, n2, "l'archive ne doit pas dupliquer")
+
+    def test_archive_missing_resume(self):
+        from archive import archive_fullstack
+        tmp = self._project()
+        ok, msg = archive_fullstack(tmp, "FEATURE-012",
+                                    controls={"review": "OK"}, hadji_verdict="OK")
+        self.assertFalse(ok)
+        self.assertIn("absent", msg)
+
+    def test_validate_conditions_all_ok(self):
+        from archive import validate_archive_conditions
+        erreurs = validate_archive_conditions(
+            {"review": "OK", "security": "OK"}, "OK", ["review", "security"])
+        self.assertEqual(erreurs, [], erreurs)
+
+    def test_validate_conditions_missing_control(self):
+        from archive import validate_archive_conditions
+        erreurs = validate_archive_conditions(
+            {"review": "OK"}, None, ["review", "security"])
+        self.assertTrue(any("security" in v for v in erreurs), erreurs)
+
+    def test_validate_conditions_hadji_not_ok(self):
+        from archive import validate_archive_conditions
+        erreurs = validate_archive_conditions(
+            {"review": "OK", "security": "OK"}, "KO", ["review", "security"])
+        self.assertTrue(any("Hadji" in v for v in erreurs), erreurs)
+
+    def test_build_entry_structure(self):
+        from archive import build_entry
+        entry = build_entry("FEATURE-001",
+                            "task_id: FEATURE-001\nscope: fullstack\n",
+                            controls={"review": "OK"},
+                            hadji_verdict="OK")
+        self.assertIn("## Tâche FEATURE-001", entry)
+        self.assertIn("review: OK", entry)
+        self.assertIn("Verdict qualité", entry)
+
+    def test_rapport_frontend_valide(self):
+        from report import parse_report, validate_report
+        rep = parse_report("task_id: FEATURE-001\nagent: frontend\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Interface faite.\n")
+        self.assertEqual(validate_report(rep), [], validate_report(rep))
+
+    def test_rapport_backend_valide(self):
+        from report import parse_report, validate_report
+        rep = parse_report("task_id: FEATURE-001\nagent: backend\nstatus: TERMINÉ\ncompleted_at: \"2026-09-26T11:00:00+04:00\"\nsummary: API faite.\n")
+        self.assertEqual(validate_report(rep), [], validate_report(rep))
+
+    def test_rapport_frontend_statut_invalide(self):
+        from report import parse_report, validate_report
+        rep = parse_report("task_id: FEATURE-001\nagent: frontend\nstatus: PROPOSÉ\ncompleted_at: \"2026-09-26T10:00:00+04:00\"\nsummary: Fait.\n")
+        self.assertTrue(any("status" in v for v in validate_report(rep)), validate_report(rep))
+
+
+class TestFullstack(unittest.TestCase):
+    def _write(self, tmp, content):
+        p = Path(tmp) / ".opencode" / "resume" / "fullstack.txt"
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(content, encoding="utf-8")
+        return p
+
+    def test_read_headers_and_sections(self):
+        from fullstack import read_fullstack
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
+            headers, sections = read_fullstack(p)
+            self.assertEqual(headers["task_id"], "FEATURE-012")
+            self.assertEqual(headers["scope"], "fullstack")
+            self.assertEqual(headers["status"], "EN COURS")
+            self.assertIn("agent: frontend", "\n".join(sections["frontend"]))
+            self.assertIn("stage_status: TERMINÉ", "\n".join(sections["frontend"]))
+            self.assertIn("agent: backend", "\n".join(sections["backend"]))
+            self.assertIn("stage_status: EN COURS", "\n".join(sections["backend"]))
+
+    def test_update_section_preserves_other(self):
+        from fullstack import read_fullstack, update_section, validate_fullstack
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
+            update_section(p, "backend", ["agent: backend", "stage_status: TERMINÉ", "summary: API faite."])
+            headers, sections = read_fullstack(p)
+            self.assertIn("stage_status: TERMINÉ", "\n".join(sections["backend"]))
+            self.assertIn("summary: UI faite.", "\n".join(sections["frontend"]))
+            self.assertEqual(validate_fullstack(headers, sections), [])
+
+    def test_validate_missing_task_id(self):
+        from fullstack import validate_fullstack
+        self.assertTrue(any("task_id" in v for v in validate_fullstack({}, {})), validate_fullstack({}, {}))
+
+    def test_validate_wrong_scope(self):
+        from fullstack import validate_fullstack
+        erreurs = validate_fullstack({"task_id": "F-1", "scope": "backend"}, {})
+        self.assertTrue(any("scope" in v for v in erreurs), erreurs)
+
+    def test_validate_missing_agent_in_section(self):
+        from fullstack import validate_fullstack
+        erreurs = validate_fullstack(
+            {"task_id": "F-1", "scope": "fullstack"},
+            {"frontend": ["stage_status: TERMINÉ"], "backend": ["agent: backend", "stage_status: TERMINÉ"]},
+        )
+        self.assertTrue(any("agent" in v and "frontend" in v for v in erreurs), erreurs)
+
+
+class TestRework(unittest.TestCase):
+    def test_rework_role_mapping(self):
+        from rework import rework_role
+        self.assertEqual(rework_role("review"), "architect")
+        self.assertEqual(rework_role("security"), "build-back")
+        self.assertEqual(rework_role("visual_qa"), "build-front")
+        self.assertEqual(rework_role("integrated"), "architect")
+        self.assertIsNone(rework_role("inconnu"))
+
+    def test_invalidate_controls_affected(self):
+        from rework import invalidate_controls
+        controls = {"review": "OK", "security": "OK", "visual_qa": "Non requis"}
+        modified = ["src/components/Button.tsx"]
+        result = invalidate_controls(controls, modified)
+        self.assertEqual(result["review"], "En attente")
+        self.assertEqual(result["security"], "En attente")
+        self.assertEqual(result["visual_qa"], "Non requis")
+
+    def test_invalidate_controls_not_affected(self):
+        from rework import invalidate_controls
+        controls = {"review": "OK", "security": "OK"}
+        modified = ["docs/readme.md"]
+        result = invalidate_controls(controls, modified)
+        self.assertEqual(result["review"], "OK")
+        self.assertEqual(result["security"], "OK")
+
+    def test_invalidate_controls_already_attente(self):
+        from rework import invalidate_controls
+        controls = {"review": "En attente", "security": "OK"}
+        modified = ["src/api/users.py"]
+        result = invalidate_controls(controls, modified)
+        self.assertEqual(result["review"], "En attente")
+        self.assertEqual(result["security"], "En attente")
+
+    def test_controls_to_replay(self):
+        from rework import controls_to_replay
+        controls = {"review": "En attente", "security": "OK", "visual_qa": "En attente"}
+        self.assertEqual(sorted(controls_to_replay(controls)), ["review", "visual_qa"])
+
+    def test_is_rework_needed(self):
+        from rework import is_rework_needed
+        self.assertTrue(is_rework_needed({"review": "En attente"}))
+        self.assertFalse(is_rework_needed({"review": "OK", "security": "OK"}))
+        self.assertFalse(is_rework_needed({}))
+
+    def test_custom_project_scopes(self):
+        from rework import invalidate_controls
+        controls = {"security": "OK"}
+        modified = ["config/auth.ts"]
+        result = invalidate_controls(controls, modified,
+                                     project_scopes={"security": ("config/",)})
+        self.assertEqual(result["security"], "En attente")
 
 
 class TestAgentContracts(unittest.TestCase):
@@ -222,7 +577,7 @@ class TestWorkflow(unittest.TestCase):
         from workflow import parse_workflow, validate_workflow
         base = ("workflow:\n  mode: supervised\n  auto_start: false\n  max_parallel_agents: 3\n"
                 "stages:\n  - id: review\n    agent: reviewer\n    trigger:\n"
-                "      report: build.txt\n      status: TERMINÉ\n    auto: true\n")
+                "      report: backend.txt\n      status: TERMINÉ\n    auto: true\n")
         self.assertEqual(validate_workflow(parse_workflow(base)[0]), [])
         variants = [
             base.replace("agent: reviewer", "agent: nope"),
@@ -231,7 +586,7 @@ class TestWorkflow(unittest.TestCase):
             base.replace("- id: review", "- id: review\n  - id: review"),
             base.replace("auto_start: false", "auto_start: true"),
             base.replace("mode: supervised", "mode: autopilote"),
-            base.replace("report: build.txt", "report: inconnu.txt"),
+            base.replace("report: backend.txt", "report: inconnu.txt"),
         ]
         for i, text in enumerate(variants):
             data, err = parse_workflow(text)
@@ -268,7 +623,7 @@ class TestStateReconcile(unittest.TestCase):
 
     def test_frais_adopte_tache(self):
         from state import reconcile
-        tmp = self._project({"build.txt": self._report("FEATURE-001", "builder", "TERMINÉ")})
+        tmp = self._project({"backend.txt": self._report("FEATURE-001", "build-back", "TERMINÉ")})
         state, notes = reconcile(tmp)
         wf = state["workflow"]
         self.assertEqual(wf["task_id"], "FEATURE-001")
@@ -279,14 +634,14 @@ class TestStateReconcile(unittest.TestCase):
 
     def test_review_validee(self):
         from state import reconcile
-        tmp = self._project({"build.txt": self._report("FEATURE-001", "builder", "TERMINÉ"),
+        tmp = self._project({"backend.txt": self._report("FEATURE-001", "build-back", "TERMINÉ"),
                              "review.txt": self._report("FEATURE-001", "reviewer", "VALIDÉ")})
         state, _ = reconcile(tmp)
         self.assertIn("review", state["workflow"]["completed_stages"])
 
     def test_corrections_rouvrent_implementation(self):
         from state import reconcile
-        tmp = self._project({"build.txt": self._report("FEATURE-001", "builder", "TERMINÉ"),
+        tmp = self._project({"backend.txt": self._report("FEATURE-001", "build-back", "TERMINÉ"),
                              "review.txt": self._report("FEATURE-001", "reviewer", "CORRECTIONS NÉCESSAIRES")})
         state, notes = reconcile(tmp, "FEATURE-001")
         wf = state["workflow"]
@@ -296,7 +651,7 @@ class TestStateReconcile(unittest.TestCase):
 
     def test_qa_a_completer_rouvre_implementation(self):
         from state import reconcile
-        tmp = self._project({"build.txt": self._report("FEATURE-001", "builder", "TERMINÉ"),
+        tmp = self._project({"backend.txt": self._report("FEATURE-001", "build-back", "TERMINÉ"),
                              "qa.txt": self._report("FEATURE-001", "qa", "À COMPLÉTER")})
         state, notes = reconcile(tmp, "FEATURE-001")
         wf = state["workflow"]
@@ -304,7 +659,7 @@ class TestStateReconcile(unittest.TestCase):
         self.assertIn("implementation", wf["pending_stages"])
         self.assertTrue(any("compléter" in n for n in notes), notes)
 
-    def test_review_sans_build_bloquee(self):
+    def test_review_sans_backend_bloquee(self):
         from state import reconcile
         tmp = self._project({"review.txt": self._report("FEATURE-001", "reviewer", "VALIDÉ")})
         state, notes = reconcile(tmp, "FEATURE-001")
@@ -313,7 +668,7 @@ class TestStateReconcile(unittest.TestCase):
 
     def test_autre_tache_ignoree(self):
         from state import reconcile, save_state, default_state
-        tmp = self._project({"build.txt": self._report("FEATURE-002", "builder", "TERMINÉ")})
+        tmp = self._project({"backend.txt": self._report("FEATURE-002", "build-back", "TERMINÉ")})
         st = default_state("FEATURE-001")
         save_state(tmp, st)
         state, notes = reconcile(tmp)
@@ -364,7 +719,7 @@ class TestWatcherEngine(unittest.TestCase):
         usable, _ = w.select_auto_stages(cfg)
         cfg = {"stages": usable}
         conds = {"security_required": False, "visual_qa_required": False, "design_required": False}
-        ready = {"build.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0, "hash": "h"}}
+        ready = {"backend.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0, "hash": "h"}}
         found = w.eligible_transitions(cfg, ready, conds, {})
         self.assertEqual(len(found), 1)
         self.assertEqual(found[0][1], "F-1")
@@ -372,7 +727,7 @@ class TestWatcherEngine(unittest.TestCase):
         self.assertEqual(w.eligible_transitions(cfg, ready, conds, stale), [])
         fresh = {"review.txt": {"task_id": "F-1", "mtime": 50.0}}
         self.assertEqual(len(w.eligible_transitions(cfg, ready, conds, fresh)), 1)
-        encours = {"build.txt": {"task_id": "F-1", "status": "EN COURS", "mtime": 100.0, "hash": "h"}}
+        encours = {"backend.txt": {"task_id": "F-1", "status": "EN COURS", "mtime": 100.0, "hash": "h"}}
         self.assertEqual(w.eligible_transitions(cfg, encours, conds, {}), [])
 
     def test_config_cassee_jamais_crash(self):
@@ -381,7 +736,7 @@ class TestWatcherEngine(unittest.TestCase):
         w = self._watcher()
         bad = _Path(tempfile.mkdtemp()) / "workflow.yaml"
         bad.write_text("stages:\n  - id: x\n    agent: nope\n    auto: true\n    trigger:\n"
-                       "      report: build.txt\n      status: TERMINÉ\n", encoding="utf-8")
+                        "      report: backend.txt\n      status: TERMINÉ\n", encoding="utf-8")
         cfg, err = w.parse_workflow_minimal(bad)
         self.assertIsNone(err, err)
         usable, notes = w.select_auto_stages(cfg)
@@ -389,15 +744,15 @@ class TestWatcherEngine(unittest.TestCase):
         self.assertEqual(len(notes), 1)
 
     def test_bom_review_couverte(self):
-        # Cas réel rencontré : review.txt avec BOM plus récente que build.txt.
+        # Cas réel rencontré : review.txt avec BOM plus récente que backend.txt.
         import tempfile
         from pathlib import Path as _Path
         w = self._watcher()
         d = _Path(tempfile.mkdtemp())
         resume = d / ".opencode" / "resume"
         resume.mkdir(parents=True)
-        (resume / "build.txt").write_text(
-            "task_id: F-1\nagent: builder\nstatus: TERMINÉ\n"
+        (resume / "backend.txt").write_text(
+            "task_id: F-1\nagent: build-back\nstatus: TERMINÉ\n"
             'completed_at: "2026-09-26T10:00:00+04:00"\nsummary: Fait.\n', encoding="utf-8")
         (resume / "review.txt").write_text(
             "\ufefftask_id: F-1\nagent: reviewer\nstatus: VALIDÉ\n"
@@ -405,13 +760,13 @@ class TestWatcherEngine(unittest.TestCase):
         import os as _os
         import time as _time
         now = _time.time()
-        _os.utime(str(resume / "build.txt"), (now - 100, now - 100))
+        _os.utime(str(resume / "backend.txt"), (now - 100, now - 100))
         _os.utime(str(resume / "review.txt"), (now, now))
         cfg, _ = w.parse_workflow_minimal(
             _Path(str(ROOT / "core" / "workflow" / "workflow.yaml")))
         usable, _ = w.select_auto_stages(cfg)
         triggers, outputs = {}, {}
-        for name in ("build.txt", "review.txt"):
+        for name in ("backend.txt", "review.txt"):
             tid, stat, mtime = w.parse_report_file(resume / name)
             self.assertEqual(tid, "F-1", name)
             triggers[name] = {"task_id": tid, "status": stat, "mtime": mtime, "hash": "h"}
@@ -491,7 +846,7 @@ class TestConditions(unittest.TestCase):
         usable, _ = w.select_auto_stages(data)
         self.assertEqual([s["id"] for s in usable], ["review", "security", "visual_qa", "rework", "rework_qa"])
         cfg = {"stages": usable}
-        build = {"build.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0, "hash": "h"}}
+        build = {"backend.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 100.0, "hash": "h"}}
         off = {"security_required": False, "visual_qa_required": False, "design_required": False}
         self.assertEqual([s["id"] for s, _, _ in w.eligible_transitions(cfg, build, off, {})],
                          ["review"])
@@ -507,12 +862,12 @@ class TestConditions(unittest.TestCase):
         off = {"security_required": False, "visual_qa_required": False, "design_required": False}
         trig = {"review.txt": {"task_id": "F-1", "status": "CORRECTIONS NÉCESSAIRES",
                                "mtime": 200.0, "hash": "h"}}
-        outs = {"build.txt": {"task_id": "F-1", "mtime": 100.0}}
+        outs = {"backend.txt": {"task_id": "F-1", "mtime": 100.0}}
         got = [s["id"] for s, _, _ in w.eligible_transitions(cfg, trig, off, outs)]
         self.assertEqual(got, ["rework"])
         # Bamse a déjà re-livré : on ne le rappelle pas, Hadji reprend.
-        outs_frais = {"build.txt": {"task_id": "F-1", "mtime": 300.0}}
-        trig2 = {"build.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 300.0, "hash": "h2"},
+        outs_frais = {"backend.txt": {"task_id": "F-1", "mtime": 300.0}}
+        trig2 = {"backend.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 300.0, "hash": "h2"},
                  "review.txt": {"task_id": "F-1", "status": "CORRECTIONS NÉCESSAIRES",
                                 "mtime": 200.0, "hash": "h"}}
         got2 = sorted(s["id"] for s, _, _ in w.eligible_transitions(cfg, trig2, off, outs_frais))
@@ -528,12 +883,12 @@ class TestConditions(unittest.TestCase):
         off = {"security_required": False, "visual_qa_required": False, "design_required": False}
         trig = {"qa.txt": {"task_id": "F-1", "status": "À COMPLÉTER",
                            "mtime": 200.0, "hash": "h"}}
-        outs = {"build.txt": {"task_id": "F-1", "mtime": 100.0}}
+        outs = {"backend.txt": {"task_id": "F-1", "mtime": 100.0}}
         got = [s["id"] for s, _, _ in w.eligible_transitions(cfg, trig, off, outs)]
         self.assertEqual(got, ["rework_qa"])
         # Bamse a déjà re-livré : on ne le rappelle pas.
-        outs_frais = {"build.txt": {"task_id": "F-1", "mtime": 300.0}}
-        trig2 = {"build.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 300.0, "hash": "h2"},
+        outs_frais = {"backend.txt": {"task_id": "F-1", "mtime": 300.0}}
+        trig2 = {"backend.txt": {"task_id": "F-1", "status": "TERMINÉ", "mtime": 300.0, "hash": "h2"},
                  "qa.txt": {"task_id": "F-1", "status": "À COMPLÉTER",
                             "mtime": 200.0, "hash": "h"}}
         got2 = sorted(s["id"] for s, _, _ in w.eligible_transitions(cfg, trig2, off, outs_frais))
@@ -547,8 +902,8 @@ class TestConditions(unittest.TestCase):
         self.assertEqual(rows["review"], "requis")
         self.assertEqual(rows["security"], "requis")
         self.assertTrue(rows["visual_qa"].startswith("inactif"))
-        self.assertEqual(rows["implementation"], "manuel")
-        self.assertEqual(rows["design"], "manuel")
+        self.assertEqual(rows["buildback"], "manuel")
+        self.assertEqual(rows["buildfront"], "manuel")
 
 
 class TestParallel(unittest.TestCase):
@@ -696,7 +1051,7 @@ class TestParallel(unittest.TestCase):
             (root / ".opencode" / "history").mkdir(parents=True)
             (root / ".opencode" / "state").mkdir(parents=True)
             stage = {"id": "review", "agent": "reviewer",
-                     "trigger": {"report": "build.txt", "status": "TERMINÉ"}}
+                     "trigger": {"report": "backend.txt", "status": "TERMINÉ"}}
             real_trigger = w.trigger_stage
             w.trigger_stage = lambda *a, **k: (False, "quota")
             try:
@@ -1042,11 +1397,11 @@ class TestSession(unittest.TestCase):
         # Regression : `table.clear()` renvoyait le curseur sur la premiere
         # ligne a chaque tick, donc le clic etait perdu en une seconde.
         t = self._tui()
-        self.assertIn("builder", t.ROLE_ORDER)
+        self.assertIn("build-back", t.ROLE_ORDER)
         # La restauration doit se baser sur l'identite du role, pas sur
         # l'index : l'index depend de l'ordre courant des lignes.
         self.assertGreater(t.ROLE_ORDER.index("reviewer"),
-                           t.ROLE_ORDER.index("builder"))
+                           t.ROLE_ORDER.index("build-back"))
 
     def test_dashboard_horodatages_en_millisecondes(self):
         # Regression : OpenCode stocke time_created/time_updated en
@@ -1073,14 +1428,14 @@ class TestSession(unittest.TestCase):
         racine = _P(_tf.mkdtemp())
         resume = racine / "resume"
         resume.mkdir(parents=True)
-        (resume / "build.txt").write_text(
+        (resume / "backend.txt").write_text(
             "task_id: FEATURE-007\nstatus: TERMINÉ\n", encoding="utf-8")
-        ligne = t.AgentRow("builder", {}, resume, "FEATURE-007",
+        ligne = t.AgentRow("build-back", {}, resume, "FEATURE-007",
                            project_root=None, model_limits={})
         # task_id identique au rapport -> l'etat doit etre celui du rapport.
         self.assertEqual(ligne.etat_plain, "TERMINÉ")
-        autre = t.AgentRow("builder", {}, resume, "FEATURE-006",
-                            project_root=None, model_limits={})
+        autre = t.AgentRow("build-back", {}, resume, "FEATURE-006",
+                           project_root=None, model_limits={})
         self.assertEqual(autre.etat_plain, "attente")
 
     def test_dashboard_format_span_au_dela_des_heures(self):
@@ -1309,15 +1664,15 @@ class TestSession(unittest.TestCase):
             root = _Path(tmp)
             resume = root / ".opencode" / "resume"
             resume.mkdir(parents=True)
-            (resume / "build.txt").write_text(
-                "task_id: F-1\nagent: builder\nstatus: TERMINÉ\n"
+            (resume / "backend.txt").write_text(
+                "task_id: F-1\nagent: build-back\nstatus: TERMINÉ\n"
                 'completed_at: "2026-10-15T10:00:00+04:00"\nsummary: Fait.\n',
                 encoding="utf-8")
             # Aucun rapport de review : l'etape est rejouable depuis le rapport.
             config = {"stages": [{"id": "review", "agent": "reviewer", "auto": True,
-                                  "trigger": {"report": "build.txt", "status": "TERMINÉ"}}]}
-            task, statut, mtime = w.parse_report_file(resume / "build.txt")
-            triggers = {"build.txt": {"task_id": task, "status": statut,
+                                  "trigger": {"report": "backend.txt", "status": "TERMINÉ"}}]}
+            task, statut, mtime = w.parse_report_file(resume / "backend.txt")
+            triggers = {"backend.txt": {"task_id": task, "status": statut,
                                       "mtime": mtime, "hash": "h"}}
             eligible = w.eligible_transitions(config, triggers, {}, {})
             self.assertEqual([s["id"] for s, _t, _w in eligible], ["review"])

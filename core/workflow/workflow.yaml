@@ -1,27 +1,27 @@
 # Workflow Sayrhazi de référence (Lot 2, contrat déclaratif).
 # Versionné avec le projet en `.opencode/workflow.yaml` : parcours lisible par
 # l'humain, sans règles dispersées dans le code. Les étapes désignent des rôles
-# stables (architect, designer, builder, reviewer, security, qa), jamais des
-# noms d'affichage. Validateur : engine/workflow.py. Modèle projet :
+# stables (architect, build-front, build-back, reviewer, security, qa),
+# jamais des noms d'affichage. Validateur : engine/workflow.py. Modèle projet :
 # runtimes/opencode/templates/workflow.yaml.
 # Sont automatiques : review (toujours), security et visual_qa (si requis),
-# rework (retour vers builder sur CORRECTIONS), rework_qa (retour vers
-# builder sur qa.txt À COMPLÉTER). `auto: false` = humain.
+# rework (retour vers build-back sur CORRECTIONS), rework_qa (retour vers
+# build-back sur qa.txt À COMPLÉTER). `auto: false` = humain.
 workflow:
   mode: supervised
   auto_start: false
   max_parallel_agents: 3
 
 stages:
-  - id: implementation
-    agent: builder
+  - id: buildback
+    agent: build-back
     trigger:
       report: plan.txt
       status: VALIDÉ
     auto: false
 
-  - id: design
-    agent: designer
+  - id: buildfront
+    agent: build-front
     condition: design_required
     trigger:
       report: plan.txt
@@ -31,7 +31,7 @@ stages:
   - id: review
     agent: reviewer
     trigger:
-      report: build.txt
+      report: backend.txt
       status: TERMINÉ
     auto: true
 
@@ -39,7 +39,7 @@ stages:
     agent: security
     condition: security_required
     trigger:
-      report: build.txt
+      report: backend.txt
       status: TERMINÉ
     auto: true
 
@@ -47,19 +47,19 @@ stages:
     agent: qa
     condition: visual_qa_required
     trigger:
-      report: build.txt
+      report: backend.txt
       status: TERMINÉ
     auto: true
 
   - id: rework
-    agent: builder
+    agent: build-back
     trigger:
       report: review.txt
       status: CORRECTIONS NÉCESSAIRES
     auto: true
 
   - id: rework_qa
-    agent: builder
+    agent: build-back
     trigger:
       report: qa.txt
       status: À COMPLÉTER

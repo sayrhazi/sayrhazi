@@ -1,0 +1,10 @@
+# Etape : implementation backend (Bamse).
+id: buildback
+agent: build-back
+requires:
+  - plan.txt
+produces:
+  - backend.txt
+next:
+  success: review
+  failure: buildfront

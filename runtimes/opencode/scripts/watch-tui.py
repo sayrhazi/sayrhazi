@@ -36,16 +36,20 @@ except ImportError:
 
 IS_WINDOWS = os.name == "nt"
 
-ROLE_ORDER = ("architect", "designer", "builder", "reviewer", "security", "qa")
-ROLE_AGENT_FILE = {"architect": "lawibrahim", "designer": "ali",
-                   "builder": "bamse", "reviewer": "hadji",
-                   "security": "hifadhui", "qa": "zawadi"}
-ROLE_REPORT = {"architect": "plan.txt", "designer": "design.txt",
-               "builder": "build.txt", "reviewer": "review.txt",
-               "security": "security.txt", "qa": "qa.txt"}
+ROLE_ORDER = ("architect", "build-front", "build-back", "reviewer", "security", "qa",
+              "frontend", "backend")
+ROLE_AGENT_FILE = {"architect": "lawibrahim", "build-front": "ali",
+                   "build-back": "bamse", "reviewer": "hadji",
+                   "security": "hifadhui", "qa": "zawadi",
+                   "frontend": "ali", "backend": "bamse"}
+ROLE_REPORT = {"architect": "plan.txt", "build-front": "frontend.txt",
+               "build-back": "backend.txt", "reviewer": "review.txt",
+               "security": "security.txt", "qa": "qa.txt",
+               "frontend": "fullstack.txt", "backend": "fullstack.txt"}
 
 TASK_RE = re.compile(r"^\s*task_id\s*:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 STATUS_RE = re.compile(r"^\s*status\s*:\s*(\S.*?)\s*$", re.MULTILINE | re.IGNORECASE)
+SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) — (Ali|Bamse)$")
 
 
 def _unquote(text: str) -> str:
@@ -115,6 +119,33 @@ def parse_report(path: Path):
             (status.group(1).strip().upper() if status else None), mtime)
 
 
+def parse_fullstack_section(path: Path, section: str) -> tuple[Optional[str], Optional[str]]:
+    """Lit (task_id, stage_status) d'une section de fullstack.txt.
+
+    Retourne (None, None) si la section ou le fichier est absent.
+    """
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").lstrip("﻿")
+    except OSError:
+        return None, None
+    current = None
+    task_id = None
+    stage_status_re = re.compile(r"^\s*stage_status\s*:\s*(\S.*?)\s*$", re.IGNORECASE)
+    for raw in text.splitlines():
+        m = SECTION_HEADER_RE.match(raw.strip())
+        if m:
+            current = m.group(1)
+            continue
+        if current == section:
+            tm = TASK_RE.search(raw)
+            if tm:
+                task_id = tm.group(1).strip()
+            sm = stage_status_re.search(raw)
+            if sm:
+                return task_id, sm.group(1).strip().upper()
+    return task_id, None
+
+
 def tail_lines(path: Path, count: int) -> list:
     try:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -132,6 +163,38 @@ def lock_info(project_root: Path):
         return pid, age
     except (OSError, ValueError, IndexError):
         return None, None
+
+
+def read_plan_scope(project_root: Path) -> tuple[str | None, dict]:
+    """Lit scope et controles depuis .opencode/resume/plan.txt.
+
+    Retourne (scope, controls) ou (None, {}) si absent.
+    """
+    path = project_root / ".opencode" / "resume" / "plan.txt"
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace").lstrip("﻿")
+    except OSError:
+        return None, {}
+    scope = None
+    controls: dict = {}
+    scope_match = re.search(r"^\s*scope\s*:\s*(\S+)", text, re.MULTILINE | re.IGNORECASE)
+    if scope_match:
+        scope = scope_match.group(1).strip()
+    for line in text.splitlines():
+        m = re.match(r"^\s{2}(\w+)\s*:\s*(\S+)", line)
+        if m and m.group(1) in ("review", "security", "visual_qa", "integrated"):
+            controls[m.group(1)] = m.group(2).strip()
+    return scope, controls
+
+
+def read_archived_task_ids(project_root: Path) -> set:
+    """Retourne les task_id déjà archivés dans fullstack-log.md."""
+    path = project_root / ".opencode" / "history" / "fullstack-log.md"
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return set()
+    return set(re.findall(r"^## Tâche (\S+)$", text, re.MULTILINE))
 
 
 SESSION_DB_PARTS = (".local", "share", "opencode", "opencode.db")
@@ -437,7 +500,18 @@ class AgentRow:
         self.report = ROLE_REPORT[role]
         running = state.get("running_agents")
         running = running if isinstance(running, list) else _flow_items(running or "[]")
-        r_task, r_status, r_mtime = parse_report(resume / self.report)
+
+        # frontend/backend lisent leur section de fullstack.txt ; les autres lisent leur rapport propre.
+        self.fullstack_section = None
+        if self.report == "fullstack.txt":
+            r_task, r_status = parse_fullstack_section(resume / self.report, role)
+            self.fullstack_section = role
+            r_mtime = (resume / self.report).stat().st_mtime if (resume / self.report).is_file() else 0
+            # task_id vient de l'en-tête (pas de la section) : utiliser le task_id global si la section n'en a pas.
+            if not r_task and task_id:
+                r_task = task_id
+        else:
+            r_task, r_status, r_mtime = parse_report(resume / self.report)
 
         if self.agent_file in running:
             self.etat = "[green]EN COURS[/]"
@@ -670,16 +744,24 @@ class SayrhaziTUI(App):
         status = str(state.get("status") or "-")
         resume = self.project_root / ".opencode" / "resume"
         pid, age = lock_info(self.project_root)
+        scope, controls = read_plan_scope(self.project_root)
+        archived = read_archived_task_ids(self.project_root)
 
         if pid is None:
             watcher_part = "[yellow]watcher : arrêté (pas de verrou)[/]"
         else:
             watcher_part = f"watcher PID [yellow]{pid}[/] · verrou {format_age(time.time() - age)}"
 
+        scope_part = f"scope [cyan]{scope}[/]" if scope else "scope [dim]non déclaré[/]"
+        controls_part = " · ".join(f"{k} [green]{v}[/]" if v == "OK" else f"{k} [yellow]{v}[/]"
+                                   for k, v in sorted(controls.items())) if controls else "contrôles : —"
+        archivé_part = f"archivé : {', '.join(sorted(archived)) or '—'}"
+
         header = self.query_one("#header", Static)
         header.update(
             f"Sayrhazi — [bold]{task_id}[/] [bold]{status}[/]  {watcher_part}"
             f"  ·  racine {self.project_root}\n"
+            f"{scope_part}  ·  {controls_part}  ·  {archivé_part}\n"
             f"[dim]Bloc session : {', '.join(GROUP_SESSION)} — la session affichée"
             f" uniquement.[/]  [dim]Bloc projet : {', '.join(GROUP_PROJET)}"
             f" — toutes les sessions de l'agent sur le projet.[/]")
@@ -751,11 +833,17 @@ def main() -> int:
         resume = root / ".opencode" / "resume"
         limits = load_model_limits(root)
         pid, age = lock_info(root)
+        scope, controls = read_plan_scope(root)
+        archived = read_archived_task_ids(root)
         if pid is None:
             watcher = "watcher : arrêté (pas de verrou)"
         else:
             watcher = f"watcher PID {pid} · verrou {format_age(time.time() - age)}"
+        scope_txt = scope or "non déclaré"
+        controls_txt = ", ".join(f"{k}={v}" for k, v in sorted(controls.items())) or "—"
+        archivé_txt = ", ".join(sorted(archived)) or "—"
         print(f"Sayrhazi — {task_id} [{status}]  {watcher}  ·  racine {root}")
+        print(f"scope: {scope_txt}  ·  contrôles: {controls_txt}  ·  archivé: {archivé_txt}")
         print()
         print(f"Bloc session : {', '.join(GROUP_SESSION)}")
         print(f"  → la session affichée uniquement ; change à chaque vague, jamais sommée.")
