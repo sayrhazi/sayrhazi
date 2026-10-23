@@ -69,8 +69,8 @@ Chaque fichier est **remplacé** à chaque passage — il ne contient que le der
 | Fichier | Écrit par | Lu par |
 |---|---|---|
 | `plan.txt` | Lawibrahim | Bamse, Ali |
-| `design.txt` | Ali | Bamse |
-| `build.txt` | Bamse | Hadji, Hifadhui, Zawadi |
+| `frontend.txt` | Ali | Hadji, Zawadi |
+| `backend.txt` | Bamse | Hadji, Hifadhui, Zawadi |
 | `review.txt` | Hadji | Bamse (si corrections), Zawadi |
 | `security.txt` | Hifadhui | Bamse (si corrections) |
 | `qa.txt` | Zawadi | Bamse (si corrections signalées) |
@@ -84,7 +84,7 @@ Chaque rapport contient : date système réelle, projet, tâche (`task_id:` stab
 
 Avant de remplacer son fichier `resume/`, chaque agent archive l'ancien contenu ici : `build-log.md`, `design-log.md`, `review-log.md`, `security-log.md`, `qa-log.md`, `frontend-log.md`, `backend-log.md`. `plan.txt` reste cumulatif jusqu'à l'archivage explicite d'une feature dans `.opencode/features/<nom>.md`. L'artefact `fullstack.txt` est archivé dans `history/fullstack-log.md` (une entrée cumulative par `task_id`, après OK global uniquement).
 
-> Les fichiers `design.txt` et `build.txt` restent lisibles pour la rétrocompatibilité des projets installés avant la v0.14.0, mais ne sont plus les rapports standards des scopes `frontend`/`backend`/`fullstack`.
+> Les fichiers `design.txt` et `build.txt` sont conservés pour la rétrocompatibilité des projets installés avant la v0.14.0 (via les aliases `ROLE_ALIASES`), mais ne figurent plus dans le tableau des rapports standards par défaut (`frontend.txt`/`backend.txt`).
 
 ## Comment ça se déroule concrètement
 

@@ -58,14 +58,6 @@ if [[ -e "$ADAPTER_ROOT/scripts/services.py" ]]; then
   cp "$ADAPTER_ROOT/scripts/services.py" "$OPENCODE_DIR/services.py"
 fi
 
-if [[ ! -e "$PROJECT_PATH/SAYRHAZI-README.md" ]]; then
-  cat > "$PROJECT_PATH/SAYRHAZI-README.md" <<'EOF'
-# Intégration Sayrhazi
-
-Compléter `.opencode/sayrhazi.yaml` avant la première tâche. Les règles génériques sont dans `AGENTS.md`; ajoutez les règles propres au projet dans une section dédiée.
-EOF
-fi
-
 echo "Sayrhazi installé dans: $PROJECT_PATH"
 echo "À compléter: $OPENCODE_DIR/sayrhazi.yaml"
 echo "Les rapports, historiques et règles existants n'ont pas été écrasés."
