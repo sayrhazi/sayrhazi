@@ -79,17 +79,6 @@ $servicesSource = Join-Path $adapterRoot 'scripts/services.py'
 if (Test-Path -LiteralPath $servicesSource) {
     Copy-Item $servicesSource (Join-Path $opencode 'services.py') -Force
 }
-
-$readme = Join-Path $resolvedProject 'SAYRHAZI-README.md'
-if (-not (Test-Path -LiteralPath $readme)) {
-    @"
-# Intégration Sayrhazi
-
-Le workflow Sayrhazi est installé dans `.opencode/`. Compléter `.opencode/sayrhazi.yaml` avant la première tâche.
-Les règles génériques se trouvent dans `AGENTS.md`; ajoutez ensuite les règles propres à ce projet sous la section prévue.
-"@ | Set-Content -LiteralPath $readme -Encoding UTF8
-}
-
 Write-Host "Sayrhazi installe dans : $resolvedProject"
-Write-Host "A completer avant usage : $config"
+    Write-Host "A completer avant usage : $config"
 Write-Host "Aucun conteneur Docker n'a ete cree. Docker reste une decision du projet applicatif."

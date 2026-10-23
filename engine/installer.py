@@ -54,16 +54,7 @@ def install_project(project: Path, core: Path) -> None:
     if models.is_file() and not (opencode / "models.yaml").is_file():
         shutil.copy2(models, opencode / "models.yaml")
 
-    readme = project / "SAYRHAZI-README.md"
-    if not readme.is_file():
-        readme.write_text(
-            "# Integration Sayrhazi\n\nLe workflow Sayrhazi est installe dans `.opencode/`. "
-            "Completer `.opencode/sayrhazi.yaml` avant la premiere tache.\n",
-            encoding="utf-8",
-        )
-
-
-def main() -> int:
+    def main() -> int:
     parser = argparse.ArgumentParser(description="Installer Sayrhazi")
     parser.add_argument("--project", default=".", help="racine du projet cible")
     args = parser.parse_args()

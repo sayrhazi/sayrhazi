@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-ROLES = ("architect", "build-front", "build-back", "reviewer", "security", "qa", "frontend", "backend")
+ROLES = ("architect", "build-front", "build-back", "reviewer", "security", "qa")
 
 TASK_STATUSES = ("À IMPLÉMENTER", "INFORMATIF", "EN COURS", "TERMINÉ", "BLOQUÉ", "VALIDÉ")
 

@@ -36,8 +36,7 @@ except ImportError:
 
 IS_WINDOWS = os.name == "nt"
 
-ROLE_ORDER = ("architect", "build-front", "build-back", "reviewer", "security", "qa",
-              "frontend", "backend")
+ROLE_ORDER = ("architect", "build-front", "build-back", "reviewer", "security", "qa")
 ROLE_AGENT_FILE = {"architect": "lawibrahim", "build-front": "ali",
                    "build-back": "bamse", "reviewer": "hadji",
                    "security": "hifadhui", "qa": "zawadi",
