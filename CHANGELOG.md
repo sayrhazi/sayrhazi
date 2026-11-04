@@ -1,3 +1,11 @@
+## 0.14.1 — 2026-10-22
+
+- Nouvel adaptateur `watch-web.py` : dashboard web sur `http://localhost:8000` (`python .opencode/watch-web.py`).
+- Lecture des rapports `.opencode/resume/`, état `.opencode/state/workflow-state.yaml`, journal `.opencode/history/workflow-log.md` et métriques d'appel chez OpenCode.
+- Rafraîchissement automatique toutes les 2 secondes.
+- Authentification npm via OIDC / Trusted Publishing (aucun jeton permanent `NPM_TOKEN` nécessaire).
+- Authentification GitHub Actions : `permissions: contents: read, id-token: write`.
+
 ## 0.14.0 — 2026-10-22
 
 - Flux frontend/backend/fullstack : scope de tâche (`frontend`, `backend`, `fullstack`) déclaré dans `plan.txt`, cohérent avec `agents_required` et les contrôles requis (`controls_required` / `controls` avec états `OK`, `KO`, `Non requis`, `En attente`).
