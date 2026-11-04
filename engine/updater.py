@@ -221,6 +221,10 @@ def main() -> int:
     if services.is_file():
         shutil.copy2(services, opencode / "services.py")
         updated += 1
+    watch_web = core / "runtimes" / "opencode" / "scripts" / "watch-web.py"
+    if watch_web.is_file():
+        shutil.copy2(watch_web, opencode / "watch-web.py")
+        updated += 1
     # workflow.yaml (Lot 2) : créé si absent, jamais touché sinon.
     tmpl_workflow = core / "runtimes" / "opencode" / "templates" / "workflow.yaml"
     if not (opencode / "workflow.yaml").is_file() and tmpl_workflow.is_file():
