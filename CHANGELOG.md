@@ -1,3 +1,11 @@
+## 0.14.2 — 2026-10-22
+
+- Dashboard web `watch-web.py` amélioré : interface HTML autonome avec sidebar, tableau de bord et rapports d'agents détaillés.
+- Ajout de `--port`, `--interval`, `--root` et `--once` au pilote `watch-web.py` pour exécution autonome ou intégrée.
+- Nouveau fichier statique `static/app.js` : affichage dynamique des agents, rapport détaillé par agent et journal du dernier jour travaillé.
+- Ajout de `static/index.html` et `static/style.css` pour l'interface web autonome.
+- `sayrhazi update` copie désormais `watch-web.py` et le dossier `static/` dans les projets existants.
+
 ## 0.14.1 — 2026-10-22
 
 - Nouvel adaptateur `watch-web.py` : dashboard web sur `http://localhost:8000` (`python .opencode/watch-web.py`).
