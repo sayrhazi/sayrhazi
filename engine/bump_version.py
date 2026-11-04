@@ -2,8 +2,8 @@
 """Bump version Sayrhazi — aligne tous les porteurs de version (stdlib uniquement).
 
 Source de vérité d'entrée : la section en tête de CHANGELOG.md (`## X.Y.Z`).
-Cibles : VERSION, pyproject.toml, package.json, template sayrhazi.yaml,
-bannière README.md.
+Cibles : VERSION, pyproject.toml, package.json, package-lock.json,
+template sayrhazi.yaml, bannière README.md.
 
 Usage :
     python engine/bump_version.py [--check] [--root .]
@@ -57,6 +57,12 @@ def apply_version(root: Path, version: str) -> list[str]:
     _write(p, _replace_once(text, r'"version":\s*"\d+\.\d+\.\d+"',
                             f'"version": "{version}"', "package.json"), text)
 
+    # package-lock.json
+    p = root / "package-lock.json"
+    text = p.read_text(encoding="utf-8")
+    _write(p, _replace_once(text, r'(?m)^\s*"version"\s*:\s*"\d+\.\d+\.\d+"',
+                            f'  "version": "{version}"', "package-lock.json"), text)
+
     # template sayrhazi.yaml
     p = root / "runtimes" / "opencode" / "templates" / "sayrhazi.yaml"
     text = p.read_text(encoding="utf-8")
@@ -100,6 +106,7 @@ def check_alignment(root: Path) -> list[str]:
         ("VERSION", (root / "VERSION").read_text(encoding="utf-8").strip(), version),
         ("pyproject.toml", _grab(root / "pyproject.toml", r'(?m)^version\s*=\s*"(\d+\.\d+\.\d+)"'), version),
         ("package.json", _grab(root / "package.json", r'"version":\s*"(\d+\.\d+\.\d+)"'), version),
+        ("package-lock.json", _grab(root / "package-lock.json", r'(?m)^\s*"version"\s*:\s*"(\d+\.\d+\.\d+)"'), version),
         ("sayrhazi.yaml", _grab(root / "runtimes" / "opencode" / "templates" / "sayrhazi.yaml",
                                 r'(?m)^\s*version:\s*"(\d+\.\d+\.\d+)"'), version),
         ("README.md", _grab(root / "README.md", r"v(\d+\.\d+\.\d+) - sayrhazi"), version),

@@ -1,7 +1,7 @@
 {
   "name": "sayrhazi",
   "version": "0.14.1",
-  "description": "Workflow multi-agents portable (moteur Python ; dashboard TUI en option via textual)",
+  "description": "Workflow multi-agents portable",
   "bin": {
     "sayrhazi": "bin/sayrhazi.js",
     "sayrhazi-tui": "bin/sayrhazi-tui.js"
