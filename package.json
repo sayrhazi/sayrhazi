@@ -2,6 +2,10 @@
   "name": "sayrhazi",
   "version": "0.14.1",
   "description": "Workflow multi-agents portable",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sayrhazi/sayrhazi.git"
+  },
   "bin": {
     "sayrhazi": "bin/sayrhazi.js",
     "sayrhazi-tui": "bin/sayrhazi-tui.js"
