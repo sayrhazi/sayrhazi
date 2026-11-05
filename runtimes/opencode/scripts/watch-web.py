@@ -4,14 +4,14 @@ Sert une interface HTML sur http://localhost:8000 qui reflète l'état du projet
 sayrhazi (rapports, états, agents, journal, watcher).
 
 Usage :
-    python .opencode/watch-web.py [--port PORT] [--once]
+    python .opencode/watch-web.py [--port PORT] [--interval SEC] [--root CHEMIN] [--once]
 """
 
 import argparse
 import html
 import importlib
+import json
 import os
-import re
 import sys
 import time
 from datetime import datetime
@@ -46,58 +46,26 @@ ROLE_AGENT_FILE = _wt.ROLE_AGENT_FILE
 ROLE_REPORT = _wt.ROLE_REPORT
 parse_report = _wt.parse_report
 parse_fullstack_section = _wt.parse_fullstack_section
+_flow_items = _wt._flow_items
+_unquote = _wt._unquote
 
 IS_WINDOWS = os.name == "nt"
 DEFAULT_PORT = 8000
 
+STATIC_DIR = _here / "static"
+
+
+def _find_project_root(start: Path) -> Optional[Path]:
+    """Remonte depuis start pour trouver .opencode/sayrhazi.yaml (sans fallback script)."""
+    current = start.resolve()
+    for candidate in [current, *current.parents]:
+        if (candidate / ".opencode" / "sayrhazi.yaml").is_file():
+            return candidate
+    return None
+
 
 def esc(text: str) -> str:
     return html.escape(str(text or ""))
-
-
-def bar_pct(usage: Optional[float], width: int = 20) -> str:
-    if usage is None:
-        return f'<span class="bar">{"·" * width}</span>'
-    try:
-        pct = max(0.0, min(1.0, float(usage)))
-    except (TypeError, ValueError):
-        return f'<span class="bar">{"·" * width}</span>'
-    filled = int(round(pct * width))
-    return f'<span class="bar"><span class="filled" style="width:{pct*100:.0f}%"></span></span>'
-
-
-def status_color(status: Optional[str]) -> str:
-    if not status:
-        return "#888"
-    s = status.upper()
-    if "VALIDÉ" in s:
-        return "#28a745"
-    if "RÉSERVES" in s:
-        return "#ffc107"
-    if "KO" in s or "ERREUR" in s or "BLOQUÉ" in s:
-        return "#dc3545"
-    if "EN COURS" in s or "IN_PROGRESS" in s:
-        return "#17a2b8"
-    if "TERMINÉ" in s:
-        return "#6f42c1"
-    return "#888"
-
-
-def _flow_items(text: str) -> list:
-    stripped = (text or "").strip()
-    if stripped.startswith("[") and stripped.endswith("]"):
-        inner = stripped[1:-1].strip()
-        if not inner:
-            return []
-        return [_unquote(p) for p in inner.split(",")]
-    return [stripped] if stripped else []
-
-
-def _unquote(text: str) -> str:
-    stripped = text.strip()
-    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in ("'", '"'):
-        return stripped[1:-1]
-    return stripped
 
 
 def build_dashboard_data(project_root: Path) -> dict:
@@ -111,22 +79,9 @@ def build_dashboard_data(project_root: Path) -> dict:
     archived = read_archived_task_ids(project_root)
 
     if pid is None:
-        watcher_html = '<span style="color:#dc3545;">●</span> watcher arrêté'
+        watcher_status = "arrêté"
     else:
-        watcher_html = f'<span style="color:#28a745;">●</span> watcher PID {pid} · {format_age(age)}'
-
-    scope_html = f'<span style="color:#0d6efd;">scope:</span> {esc(scope or "non déclaré")}'
-    controls_html = ""
-    if controls:
-        parts = []
-        for k, v in sorted(controls.items()):
-            color = "#28a745" if v == "OK" else "#ffc107"
-            parts.append(f'<span style="color:{color};">{esc(k)}={esc(v)}</span>')
-        controls_html = " · ".join(parts)
-    else:
-        controls_html = '<span style="color:#6c757d;">contrôles: —</span>'
-
-    archived_html = f'<span style="color:#6c757d;">archivé:</span> {", ".join(sorted(archived)) or "—"}'
+        watcher_status = f"en cours (PID {pid})"
 
     agents = []
     db_path = opencode_db_path()
@@ -145,12 +100,20 @@ def build_dashboard_data(project_root: Path) -> dict:
         else:
             r_task, r_status, _ = parse_report(report_path)
 
+        report_content = ""
+        report_path_obj = resume / report_file
+        if report_path_obj.is_file():
+            try:
+                report_content = report_path_obj.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                report_content = "(impossible de lire le rapport)"
+
         if agent_file in running:
             etat = "EN COURS"
             etat_color = "#17a2b8"
         elif r_task and task_id and r_task == task_id:
             etat = str(r_status or "OK")
-            etat_color = status_color(r_status)
+            etat_color = "#28a745" if str(r_status or "OK") == "VALIDÉ" else "#ffc107"
         elif r_task:
             etat = "attente"
             etat_color = "#6c757d"
@@ -219,138 +182,20 @@ def build_dashboard_data(project_root: Path) -> dict:
             "rapport_etat": f"{r_status or '-'} · {format_age(0)}" if r_task else "-",
             "etat": etat,
             "etat_color": etat_color,
+            "report_content": report_content,
         })
 
     return {
         "task_id": task_id,
         "status": status,
-        "watcher": watcher_html,
-        "scope": scope_html,
-        "controls": controls_html,
-        "archived": archived_html,
+        "watcher": watcher_status,
+        "scope": scope or "non déclaré",
+        "controls": controls,
+        "archived": sorted(archived),
         "root": str(project_root),
         "agents": agents,
         "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
-
-
-CSS = """
-:root { --bg: #0f172a; --panel: #1e293b; --text: #f8fafc; --muted: #94a3b8; --accent: #38bdf8; }
-* { box-sizing: border-box; }
-body { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--bg); color: var(--text); margin: 0; padding: 1rem; }
-.header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #334155; }
-.header h1 { margin: 0; font-size: 1.25rem; color: var(--accent); }
-.meta { display: flex; gap: 1rem; flex-wrap: wrap; font-size: 0.9rem; color: var(--muted); }
-.meta span { margin-right: 1rem; }
-.table-wrap { overflow-x: auto; margin-bottom: 1rem; }
-table { width: 100%; border-collapse: collapse; background: var(--panel); }
-th, td { padding: 0.5rem 0.75rem; text-align: left; border-bottom: 1px solid #334155; }
-th { background: #0f172a; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; position: sticky; top: 0; z-index: 1; }
-tr:hover { background: #334155; }
-td.agent { font-weight: bold; color: #60a5fa; }
-td.role { font-size: 0.85rem; color: #cbd5e1; }
-td.etat { font-weight: bold; }
-.detail { margin-top: 1rem; background: var(--panel); padding: 1rem; border-radius: 0.5rem; }
-.detail h3 { margin-top: 0; font-size: 1rem; color: var(--accent); }
-.detail pre { background: #020617; padding: 0.75rem; border-radius: 0.4rem; font-size: 0.85rem; overflow: auto; }
-.logs { margin-top: 1rem; background: var(--panel); padding: 1rem; border-radius: 0.5rem; }
-.logs h3 { margin-top: 0; font-size: 1rem; color: var(--accent); }
-.logs pre { background: #020617; padding: 0.75rem; border-radius: 0.4rem; font-size: 0.75rem; color: #94a3b8; overflow: auto; white-space: pre-wrap; }
-.refresh { margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
-.refresh b { color: var(--accent); cursor: pointer; }
-"""
-
-HTML_TEMPLATE = """<!DOCTYPE html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<title>Sayrhazi — {task_id}</title>
-<style>{css}</style>
-<meta http-equiv="refresh" content="{interval}">
-</head>
-<body>
-<div class="header">
-  <h1>Sayrhazi — <span style="color:{status_color}">{task_id}</span> [{status}]</h1>
-  <div class="meta">
-    {watcher}<br>
-    {scope} · {controls}<br>
-    {archived}<br>
-    <span>racine: {root}</span><br>
-    <span>généré: {now}</span>
-  </div>
-</div>
-
-<div class="table-wrap">
-<table>
-<thead>
-<tr>
-<th>Agent</th><th>Rôle</th><th>Session</th><th>Origine</th><th>Jauge</th><th>Tokens</th><th>%</th><th>Coût sess.</th>
-<th>Auto</th><th>Manuel</th><th>Coût proj.</th><th>Rapport</th><th>État</th>
-</tr>
-</thead>
-<tbody>
-{rows}
-</tbody>
-</table>
-</div>
-
-<div class="detail">
-<h3>Détail de l'agent sélectionné</h3>
-<p class="refresh"><b>Rafraîchir</b> la page pour voir l'état actuel.</p>
-</div>
-
-<div class="logs">
-<h3>Journal (workflow-log.md)</h3>
-<pre>{logs}</pre>
-</div>
-</body>
-</html>
-"""
-
-
-def render_html(data: dict, interval: int) -> str:
-    rows = []
-    for a in data["agents"]:
-        rows.append(f"""
-<tr>
-<td class="agent">{esc(a['agent_file'])}</td>
-<td class="role">{esc(a['role'])}</td>
-<td>{esc(a['sid'])}</td>
-<td>{esc(a['origine'])}</td>
-<td>{bar_pct(None)}</td>
-<td>{esc(a['tokens'])}</td>
-<td>{esc(a['usage_pct'])}</td>
-<td>{esc(a['cout_sess'])}</td>
-<td>{esc(a['calls'])}</td>
-<td>{esc(a['manual_calls'])}</td>
-<td>{esc(a['cout_projet'])}</td>
-<td>{esc(a['rapport_etat'])}</td>
-<td style="color:{a['etat_color']};font-weight:bold;">{esc(a['etat'])}</td>
-</tr>
-""")
-
-    logs_path = Path(data["root"]) / ".opencode" / "history" / "workflow-log.md"
-    try:
-        log_lines = tail_lines(logs_path, 10)
-        logs_html = "\n".join(esc(l) for l in log_lines) or "(aucun log)"
-    except Exception:
-        logs_html = "(lecture impossible)"
-
-    return HTML_TEMPLATE.format(
-        css=CSS,
-        task_id=esc(data["task_id"]),
-        status_color=status_color(data["status"]),
-        status=esc(data["status"]),
-        watcher=data["watcher"],
-        scope=data["scope"],
-        controls=data["controls"],
-        archived=data["archived"],
-        root=esc(data["root"]),
-        now=data["now"],
-        rows="".join(rows),
-        interval=interval,
-        logs=logs_html,
-    )
 
 
 def tail_lines(path: Path, count: int) -> list:
@@ -361,6 +206,24 @@ def tail_lines(path: Path, count: int) -> list:
     return lines[-max(1, count):] if lines else []
 
 
+def tail_lines_today(path: Path) -> list:
+    """Retourne les lignes du dernier jour travaillé dans le journal."""
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+    dates_seen = set()
+    for line in lines:
+        if line.strip() and len(line) >= 10:
+            date_part = line[:10]
+            if date_part[:4].isdigit() and date_part[4] == "-" and date_part[7] == "-":
+                dates_seen.add(date_part)
+    if not dates_seen:
+        return []
+    last_day = sorted(dates_seen)[-1]
+    return [line for line in lines if line.startswith(last_day)]
+
+
 class Handler(BaseHTTPRequestHandler):
     project_root: Path = Path.cwd()
     interval: int = 2
@@ -368,36 +231,98 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         pass
 
-    def do_GET(self):
-        if self.path in ("/", "/index.html"):
-            data = build_dashboard_data(self.project_root)
-            html = render_html(data, self.interval)
+    def _send_file(self, path: Path, content_type: str):
+        try:
+            content = path.read_text(encoding="utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Type", f"{content_type}; charset=utf-8")
             self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
-        elif self.path == "/refresh":
-            data = build_dashboard_data(self.project_root)
-            html = render_html(data, self.interval)
-            self.send_response(200)
-            self.send_header("Content-Type", "text/html; charset=utf-8")
-            self.end_headers()
-            self.wfile.write(html.encode("utf-8"))
-        else:
+            self.wfile.write(content.encode("utf-8"))
+        except OSError:
             self.send_response(404)
             self.end_headers()
+        except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+            pass
+
+    def do_GET(self):
+        if self.path == "/api/data":
+            data = build_dashboard_data(self.project_root)
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.end_headers()
+                self.wfile.write(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                pass
+            return
+
+        if self.path.startswith("/report/"):
+            report_file = self.path.split("/report/", 1)[1]
+            resume = self.project_root / ".opencode" / "resume"
+            report_path = resume / report_file
+            if report_path.is_file():
+                try:
+                    content = report_path.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    content = "(impossible de lire le rapport)"
+            else:
+                content = "(rapport introuvable)"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            try:
+                self.wfile.write(content.encode("utf-8"))
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                pass
+            return
+
+        if self.path == "/api/logs":
+            logs_path = self.project_root / ".opencode" / "history" / "workflow-log.md"
+            try:
+                lines = tail_lines_today(logs_path)
+                content = "\n".join(lines) if lines else "Aucun journal aujourd'hui"
+            except OSError:
+                content = "(journal indisponible)"
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            try:
+                self.wfile.write(content.encode("utf-8"))
+            except (BrokenPipeError, ConnectionAbortedError, ConnectionResetError):
+                pass
+            return
+
+        if self.path in ("/", "/index.html"):
+            self._send_file(STATIC_DIR / "index.html", "text/html")
+            return
+
+        if self.path == "/style.css":
+            self._send_file(STATIC_DIR / "style.css", "text/css")
+            return
+
+        if self.path == "/app.js":
+            self._send_file(STATIC_DIR / "app.js", "application/javascript")
+            return
+
+        self.send_response(404)
+        self.end_headers()
 
 
 def main():
     parser = argparse.ArgumentParser(description="Dashboard web Sayrhazi")
     parser.add_argument("--port", type=int, default=DEFAULT_PORT, help="Port d'écoute")
     parser.add_argument("--interval", type=int, default=2, help="Intervalle de rafraîchissement (secondes)")
-    parser.add_argument("--once", action="store_true", help="Un seul rendu HTML puis sortie")
+    parser.add_argument("--root", type=str, default=None, help="Racine du projet Sayrhazi (défaut : détectée depuis le répertoire courant)")
+    parser.add_argument("--once", action="store_true", help="Un seul rendu JSON puis sortie")
     args = parser.parse_args()
 
-    root = find_project_root(Path.cwd())
+    if args.root:
+        root = Path(args.root).resolve()
+    else:
+        root = _find_project_root(Path.cwd())
     if root is None:
         print("ERREUR : racine projet introuvable (.opencode/sayrhazi.yaml absent).")
+        print("       Utilisez --root <chemin> pour spécifier la racine manuellement.")
         return 2
 
     Handler.project_root = root
@@ -405,7 +330,7 @@ def main():
 
     if args.once:
         data = build_dashboard_data(root)
-        print(render_html(data, args.interval))
+        print(json.dumps(data, ensure_ascii=False))
         return 0
 
     print(f"Sayrhazi web — http://localhost:{args.port}/")
@@ -419,5 +344,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import sys
     sys.exit(main())

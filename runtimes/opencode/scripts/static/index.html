@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Sayrhazi — Dashboard</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<div class="sidebar">
+  <div class="sidebar-header">
+    <h2>Sayrhazi</h2>
+    <span id="sidebar-version" class="badge">—</span>
+  </div>
+  <nav class="sidebar-nav">
+    <h3>Tableau de bord</h3>
+    <ul class="nav-list">
+      <li><a href="#" data-view="dashboard" class="active">Vue d'ensemble</a></li>
+    </ul>
+    <h3>Agents</h3>
+    <ul class="nav-list" id="agent-list">
+      <!-- Rempli par JavaScript depuis l'API /api/data -->
+    </ul>
+  </nav>
+</div>
+
+<div class="main">
+  <header class="main-header">
+    <h1 id="page-title">Sayrhazi</h1>
+    <div class="meta">
+      <span id="status-badge" class="badge">—</span>
+      <span id="watcher-status">—</span>
+    </div>
+  </header>
+
+  <!-- Vue d'ensemble : tableau + journal ensemble -->
+  <section id="view-dashboard" class="view active">
+    <div class="summary-cards">
+      <div class="card">
+        <h4>Scope</h4>
+        <p id="card-scope">—</p>
+      </div>
+      <div class="card">
+        <h4>Contrôles</h4>
+        <p id="card-controls">—</p>
+      </div>
+      <div class="card">
+        <h4>Archivé</h4>
+        <p id="card-archived">—</p>
+      </div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Agent</th>
+          <th>Rôle</th>
+          <th>Session</th>
+          <th>Origine</th>
+          <th>Tokens</th>
+          <th>Usage %</th>
+          <th>Coût sess.</th>
+          <th>Auto</th>
+          <th>Manuel</th>
+          <th>Coût proj.</th>
+          <th>Rapport</th>
+          <th>État</th>
+        </tr>
+      </thead>
+      <tbody id="dashboard-table-body">
+      </tbody>
+    </table>
+
+    <div class="logs" style="margin-top: 2rem;">
+      <h3>Journal (workflow-log.md)</h3>
+      <pre id="logs-content"></pre>
+    </div>
+  </section>
+
+  <!-- Section Agent (affichée quand on clique sur un agent) -->
+  <section id="view-agent" class="view hidden">
+    <h3 id="agent-detail-title">Rapport — <span id="detail-agent-name"></span></h3>
+    <div class="agent-meta">
+      <p><strong>Rôle :</strong> <span id="detail-agent-role">—</span></p>
+      <p><strong>Fichier :</strong> <span id="detail-agent-file">—</span></p>
+      <p><strong>État :</strong> <span id="detail-agent-etat" class="badge">—</span></p>
+      <p><strong>Session :</strong> <span id="detail-agent-session">—</span></p>
+      <p><strong>Origine :</strong> <span id="detail-agent-origine">—</span></p>
+      <p><strong>Rapport :</strong> <span id="detail-agent-report">—</span></p>
+    </div>
+    <div class="report-content">
+      <pre id="report-content"></pre>
+    </div>
+  </section>
+</div>
+
+<script src="/app.js"></script>
+</body>
+</html>

@@ -225,6 +225,17 @@ def main() -> int:
     if watch_web.is_file():
         shutil.copy2(watch_web, opencode / "watch-web.py")
         updated += 1
+    # Fichiers statiques du dashboard web (HTML, CSS, JS)
+    static_src = core / "runtimes" / "opencode" / "scripts" / "static"
+    static_dst = opencode / "static"
+    if static_src.is_dir():
+        for f in static_src.rglob("*"):
+            if f.is_file():
+                rel = f.relative_to(static_src)
+                dst = static_dst / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(f, dst)
+                updated += 1
     # workflow.yaml (Lot 2) : créé si absent, jamais touché sinon.
     tmpl_workflow = core / "runtimes" / "opencode" / "templates" / "workflow.yaml"
     if not (opencode / "workflow.yaml").is_file() and tmpl_workflow.is_file():
