@@ -648,6 +648,7 @@ async function finalizeLiveConversation(sessionId) {
         block.appendChild(wrapper.firstElementChild);
       }
     });
+    if (isScrolledToBottom()) scrollChatToBottom();
     return true;
   } catch (err) {
     console.error("Finalisation en direct impossible:", err);
@@ -693,6 +694,9 @@ function renderStreamItemInPlace(msg, item) {
   const newEl = block.querySelector('[data-part-id="' + cssEscape(item.part_id || "") + '"]');
   if (newEl) applySyntaxHighlight(newEl);
   wireAgentBlock(block);
+  // Scroll après l'insertion/remplacement : `scrollChatToBottom` lit
+  // scrollHeight, donc il voit le contenu ajouté à cette frame.
+  if (isScrolledToBottom()) scrollChatToBottom();
 }
 
 // Routeur des événements du flux SSE /api/chat/stream.

@@ -1276,7 +1276,11 @@ td.etat {
   font-family: monospace;
   color: var(--muted);
   opacity: 0.85;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  min-width: 0;
 }
 
 /* Theme highlight.js (assombri, adapte au dashboard) */
@@ -1347,8 +1351,11 @@ td.etat {
 /* Bloc de sortie d'outil (Bash, Playwright) : hauteur limitee + depliage */
 .tool-content-wrap {
   flex: 0 0 100%;
+  min-width: 0;
+  max-width: 100%;
   margin: 0.2rem 0 0;
   position: relative;
+  box-sizing: border-box;
 }
 
 .tool-content {
@@ -1358,6 +1365,10 @@ td.etat {
   border: 1px solid #333;
   border-radius: 0.35rem;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  max-width: 100%;
+  box-sizing: border-box;
   font-family: monospace;
   font-size: 0.75rem;
   line-height: 1.45;
