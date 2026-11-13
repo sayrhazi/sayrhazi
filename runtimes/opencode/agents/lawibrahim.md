@@ -1,7 +1,7 @@
 ---
 description: Partenaire de réflexion et architecte Sayrhazi
 mode: primary
-model: opencode/nemotron-3.5-super-vl-free
+model: opencode/inkling-2-small-free
 color: "#8B5CF6"
 ---
 

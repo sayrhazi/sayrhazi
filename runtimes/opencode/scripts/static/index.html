@@ -30,6 +30,11 @@
       <span id="status-badge" class="badge">—</span>
       <span id="watcher-status">—</span>
     </div>
+    <div class="watcher-controls">
+      <button id="btn-watcher-start" class="btn btn-success">Démarrer le watcher</button>
+      <button id="btn-watcher-stop" class="btn btn-danger" disabled>Arrêter le watcher</button>
+      <span id="watcher-control-status" class="badge">inconnu</span>
+    </div>
   </header>
 
   <!-- Vue d'ensemble : tableau + journal ensemble -->
@@ -46,6 +51,11 @@
       <div class="card">
         <h4>Archivé</h4>
         <p id="card-archived">—</p>
+      </div>
+      <div class="card card-watcher">
+        <h4>Watcher</h4>
+        <p id="card-watcher-status" class="badge">—</p>
+        <p id="card-watcher-pid" style="font-size:0.8rem;color:var(--muted)">—</p>
       </div>
     </div>
 
@@ -71,14 +81,26 @@
     </table>
 
     <div class="logs" style="margin-top: 2rem;">
-      <h3>Journal (workflow-log.md)</h3>
-      <pre id="logs-content"></pre>
+      <h3>Journal & Watcher</h3>
+      <div class="logs-split">
+        <div class="log-panel">
+          <h4>Workflow log (workflow-log.md)</h4>
+          <pre id="logs-content"></pre>
+        </div>
+        <div class="log-panel">
+          <h4>Watcher (sortie console)</h4>
+          <pre id="watcher-logs-content"></pre>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- Section Agent (affichée quand on clique sur un agent) -->
   <section id="view-agent" class="view hidden">
-    <h3 id="agent-detail-title">Rapport — <span id="detail-agent-name"></span></h3>
+    <div class="agent-header">
+      <h3 id="agent-detail-title">Rapport — <span id="detail-agent-name"></span></h3>
+      <button id="btn-back-to-chat" class="btn">Retour au chat</button>
+    </div>
     <div class="agent-meta">
       <p><strong>Rôle :</strong> <span id="detail-agent-role">—</span></p>
       <p><strong>Fichier :</strong> <span id="detail-agent-file">—</span></p>
@@ -91,8 +113,51 @@
       <pre id="report-content"></pre>
     </div>
   </section>
+
+  <!-- Vue Chat avec les agents -->
+  <section id="view-chat" class="view hidden">
+    <div class="chat-header">
+      <h3 id="chat-agent-title">Chat — <span id="chat-agent-name"></span></h3>
+      <span id="chat-agent-status" class="badge">—</span>
+      <button id="btn-view-report" class="btn" style="display:none;">Voir rapport</button>
+      <button id="btn-debug-json" class="btn" style="display:none;margin-left:0.5rem;">Debug JSON</button>
+    </div>
+    <div id="debug-json-panel" style="display:none;margin-top:1rem;padding:1rem;background:#1a1a1a;color:#0f0;font-family:monospace;font-size:0.75rem;overflow:auto;max-height:30rem;border:1px solid #333;white-space:pre-wrap;"></div>
+    <div class="chat-split">
+      <!-- Colonne gauche : liste des sessions -->
+      <aside class="chat-sidebar">
+        <div class="chat-sidebar-header">
+          <h4>Sessions</h4>
+          <button id="btn-new-session" class="btn btn-success btn-small">Nouvelle session</button>
+        </div>
+        <div class="chat-session-list" id="chat-session-list">
+          <div class="chat-empty">Aucune session encore. Cliquez sur « Nouvelle session » pour commencer une conversation.</div>
+        </div>
+      </aside>
+
+      <!-- Colonne droite : discussion -->
+      <main class="chat-main">
+        <div class="chat-conversation" id="chat-conversation">
+          <div class="chat-empty">Sélectionnez une session à gauche pour commencer la discussion, ou créez une nouvelle session.</div>
+        </div>
+        <div class="chat-input">
+          <button id="chat-attach-btn" title="Joindre">+</button>
+          <div id="chat-attach-panel" class="chat-attach-panel" style="display:none;">
+            <div class="chat-attach-item" data-action="file">Joindre un fichier</div>
+            <div class="chat-attach-item" data-action="files">Fichiers</div>
+            <div class="chat-attach-item" data-action="directory">Répertoires</div>
+          </div>
+          <textarea id="chat-message-input" placeholder="Écrivez un message à l'agent..." rows="1" spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
+          <button id="chat-send-btn" title="Envoyer">↑</button>
+        </div>
+      </main>
+    </div>
+  </section>
 </div>
 
-<script src="/app.js"></script>
+<script src="/marked.min.js"></script>
+<script src="/purify.min.js"></script>
+<script src="/hljs.bundle.js"></script>
+<script src="/sayrhazi-server.js"></script>
 </body>
 </html>

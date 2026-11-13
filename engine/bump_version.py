@@ -16,7 +16,7 @@ import re
 import sys
 from pathlib import Path
 
-VERSION_RE = re.compile(r"^## (\d+\.\d+\.\d+)(?:\s+—.*)?$", re.MULTILINE)
+VERSION_RE = re.compile(r"^## (\d+\.\d+\.\d+)(?:\s+-.*)?$", re.MULTILINE)
 
 
 def top_version(changelog: str) -> str | None:

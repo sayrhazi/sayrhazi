@@ -3,7 +3,7 @@ name: Bamse
 role: build-back
 description: Implémentation backend et logique serveur
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
-model: opencode/nemotron-3.5-super-vl-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
+model: opencode/inkling-2-small-free
 color: "#22C55E"
 display_key: agents.builder

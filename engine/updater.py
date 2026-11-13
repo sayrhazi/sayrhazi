@@ -22,6 +22,9 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from agent_sync import read_model, write_model, sync_home_opencode
+
 VERSION_RE = re.compile(r'^\s*version:\s*"([^"]+)"\s*(#.*)?$', re.MULTILINE)
 TOP_KEY_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):")
 
@@ -77,12 +80,20 @@ def migrate_config(inst_path: Path, tmpl_path: Path, history_dir: Path) -> tuple
             changed = True
 
     # 1b. Cle `designer:` manquante dans une section agents existante.
-    # Nucleus v0.14.0 : les clés builder-front / builder-back sont utilisées à la place.
-    # Les anciens rapports contenant agent: designer restent lisibles via les aliases
-    # dans engine/report.py, mais la configuration courante ne réinjecte plus cette clé.
     if has(r"^\s*architect\s*:") and not has(r"^\s*designer\s*:"):
-        # Ne plus rien faire : la config reste telle quelle
-        pass
+        # Extraire la ligne designer depuis le template et l'ajouter après architect
+        designer_line = None
+        for tmpl_line in tmpl_lines:
+            if re.match(r"^\s*designer\s*:", tmpl_line):
+                designer_line = tmpl_line
+                break
+        if designer_line:
+            for i, l in enumerate(inst_lines):
+                if re.match(r"^\s*architect\s*:", l):
+                    inst_lines.insert(i + 1, designer_line)
+                    added.append("agents.designer (cle ajoutee depuis le template)")
+                    changed = True
+                    break
 
     # 2. Sections top-level du template integralement absentes -> ajout.
     inst_tops = {m.group(1) for l in inst_lines if (m := TOP_KEY_RE.match(l))}
@@ -144,87 +155,39 @@ def main() -> int:
     for d in ("agent", "resume", "history", "features", "state", "backup"):
         (opencode / d).mkdir(parents=True, exist_ok=True)
 
-    def _read_model(path: Path) -> str | None:
-        """Lit la valeur de `model:` dans le frontmatter YAML en debut de fichier."""
-        try:
-            text = path.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            return None
-        m = re.search(r"^---\s*\n(.*?)\n---\s*\n", text, re.DOTALL)
-        if not m:
-            return None
-        for line in m.group(1).splitlines():
-            mm = re.match(r'^\s*model:\s*"?([^"]+)"?\s*$', line)
-            if mm:
-                return mm.group(1).strip()
-        return None
-
-    def _write_model(path: Path, model: str) -> None:
-        """Remplace ou ajoute la ligne `model:` dans le frontmatter YAML
-        sans altérer l'indentation ni ajouter de guillemets."""
-        text = path.read_text(encoding="utf-8", errors="replace")
-        m = re.search(r"(---\s*\n)(.*?)(\n---\s*\n)", text, re.DOTALL)
-        if not m:
-            return
-        head, body, tail = m.group(1), m.group(2), m.group(3)
-        lines = body.splitlines()
-        replaced = False
-        for i, line in enumerate(lines):
-            mm = re.match(r'^(\s*model:\s*).+?\s*$', line)
-            if mm:
-                lines[i] = mm.group(1) + model
-                replaced = True
-                break
-        if not replaced:
-            lines.insert(0, 'model: ' + model)
-        path.write_text(head + "\n".join(lines) + tail + text[m.end():], encoding="utf-8")
-
     updated = 0
     adapter_agents = core / "runtimes" / "opencode" / "agents"
     for src in sorted(adapter_agents.glob("*.md")):
         dst = opencode / "agent" / src.name
-        model = _read_model(dst) if dst.is_file() else None
+        model = read_model(dst) if dst.is_file() else None
         shutil.copy2(src, dst)
         if model:
-            _write_model(dst, model)
+            write_model(dst, model)
         updated += 1
 
     # Propager aussi vers le dossier personnel OpenCode (~/.opencode/agent) :
-    # c'est là qu'OpenCode lit le `model:` de chaque agent au lancement,
-    # indépendamment de tout projet. Ainsi un changement de modèle se répercute
-    # sur toutes les sessions sans script à part.
-    home_agent_dir = Path.home() / ".opencode" / "agent"
-    if home_agent_dir.is_dir():
-        for src in sorted(adapter_agents.glob("*.md")):
-            dst = home_agent_dir / src.name
-            model = _read_model(dst) if dst.is_file() else None
-            shutil.copy2(src, dst)
-            if model:
-                _write_model(dst, model)
-            updated += 1
+    # c'est là qu'OpenCode lit le `model:` de chaque agent au lancement. La
+    # fiche du projet fait foi (model inclus) ; le projet étant déjà à jour,
+    # le dossier personnel reflète ses choix sur tout environnement. Un échec
+    # ne doit pas faire échouer la mise à jour.
+    try:
+        updated += len(sync_home_opencode(root, core))
+    except OSError as exc:
+        print("Avertissement : synchronisation de ~/.opencode/agent impossible (" + str(exc) + ")")
 
-    watcher = core / "runtimes" / "opencode" / "scripts" / "watch-work.py"
-    if watcher.is_file():
-        shutil.copy2(watcher, opencode / "watch-work.py")
-        updated += 1
-    tui = core / "runtimes" / "opencode" / "scripts" / "watch-tui.py"
-    if tui.is_file():
-        shutil.copy2(tui, opencode / "watch-tui.py")
-        updated += 1
     # Registre des fenêtres de contexte : créé seulement s'il est absent
     # (un projet peut vouloir sa propre table de modèles).
     models_registry = core / "core" / "runtime" / "models.yaml"
     if models_registry.is_file() and not (opencode / "models.yaml").is_file():
         shutil.copy2(models_registry, opencode / "models.yaml")
         updated += 1
-    services = core / "runtimes" / "opencode" / "scripts" / "services.py"
-    if services.is_file():
-        shutil.copy2(services, opencode / "services.py")
-        updated += 1
-    watch_web = core / "runtimes" / "opencode" / "scripts" / "watch-web.py"
-    if watch_web.is_file():
-        shutil.copy2(watch_web, opencode / "watch-web.py")
-        updated += 1
+
+    for name in ("watch-work.py", "services.py", "sayrhazi-modules.py",
+                 "sayrhazi-serveur.py"):
+        src = core / "runtimes" / "opencode" / "scripts" / name
+        if src.is_file():
+            shutil.copy2(src, opencode / name)
+            updated += 1
     # Fichiers statiques du dashboard web (HTML, CSS, JS)
     static_src = core / "runtimes" / "opencode" / "scripts" / "static"
     static_dst = opencode / "static"

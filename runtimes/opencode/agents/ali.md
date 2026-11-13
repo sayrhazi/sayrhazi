@@ -1,7 +1,7 @@
 ---
 description: Interface frontend et maquette UI/UX
 mode: primary
-model: opencode/nemotron-3.5-super-vl-free
+model: opencode/inkling-2-small-free
 color: "#3B82F6"
 permission:
   playwright_*: allow

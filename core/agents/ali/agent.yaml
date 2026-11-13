@@ -3,8 +3,8 @@ name: Ali
 role: build-front
 description: Interface frontend et maquette UI/UX
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
-model: opencode/nemotron-3.5-super-vl-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
+model: opencode/inkling-2-small-free
 color: "#3B82F6"
 display_key: agents.designer
 permission:

@@ -1,7 +1,7 @@
 ---
 description: Implémentation backend et logique serveur
 mode: primary
-model: opencode/nemotron-3.5-super-vl-free
+model: opencode/inkling-2-small-free
 color: "#22C55E"
 ---
 

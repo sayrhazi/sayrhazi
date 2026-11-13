@@ -1,7 +1,7 @@
 ---
 description: QA visuelle et fonctionnelle Sayrhazi
 mode: primary
-model: opencode/nemotron-3.5-super-vl-free
+model: opencode/inkling-2-small-free
 color: "#14B8A6"
 permission:
   playwright_*: allow
