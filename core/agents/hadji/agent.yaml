@@ -3,7 +3,7 @@ name: Hadji
 role: reviewer
 description: Reviewer qualité Sayrhazi
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
-model: opencode/nemotron-3.5-super-vl-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
+model: opencode/inkling-2-small-free
 color: "#F59E0B"
 display_key: agents.reviewer

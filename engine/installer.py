@@ -4,6 +4,8 @@
 Cree .opencode/agent|resume|history|features|state|backup, recopie agents + watcher
 (Force), cree AGENTS.md / sayrhazi.yaml / opencode.json uniquement si
 absents. Ne supprime ni ne remplace rapports, historiques ou config.
+Synchronise ensuite le dossier personnel OpenCode (~/.opencode/agent) avec
+le projet : c'est là qu'OpenCode lit le `model:` au lancement.
 
 Usage :
     python engine/installer.py --project <racine>
@@ -14,6 +16,9 @@ import argparse
 import shutil
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from agent_sync import sync_home_opencode
 
 
 def install_project(project: Path, core: Path) -> None:
@@ -35,17 +40,38 @@ def install_project(project: Path, core: Path) -> None:
         if not dest.is_file():
             shutil.copy2(templates / name, dest)
 
-    watcher = core / "runtimes" / "opencode" / "scripts" / "watch-work.py"
-    if watcher.is_file():
-        shutil.copy2(watcher, opencode / "watch-work.py")
+    scripts = core / "runtimes" / "opencode" / "scripts"
+    # sayrhazi-modules.py doit exister AVANT le serveur (importé par
+    # sayrhazi-serveur.py) ; le dashboard web passe par sayrhazi-serveur.py.
+    for name in ("watch-work.py", "services.py", "sayrhazi-modules.py",
+                 "sayrhazi-serveur.py"):
+        src = scripts / name
+        if src.is_file():
+            shutil.copy2(src, opencode / name)
 
-    services = core / "runtimes" / "opencode" / "scripts" / "services.py"
-    if services.is_file():
-        shutil.copy2(services, opencode / "services.py")
+    static_src = scripts / "static"
+    static_dst = opencode / "static"
+    if static_src.is_dir():
+        for src in sorted(static_src.rglob("*")):
+            if not src.is_file():
+                continue
+            rel = src.relative_to(static_src)
+            dst = static_dst / rel
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(src, dst)
 
-    tui = core / "runtimes" / "opencode" / "scripts" / "watch-tui.py"
-    if tui.is_file():
-        shutil.copy2(tui, opencode / "watch-tui.py")
+    # Synchroniser le dossier personnel OpenCode (~/.opencode/agent) avec le
+    # projet : OpenCode y lit le `model:` de chaque agent au lancement. La
+    # fiche du projet fait foi (model inclus). Fonctionne sur tout
+    # environnement (Path.home()). Un échec de la synchronisation ne doit pas
+    # faire échouer l'installation.
+    try:
+        ecrits = sync_home_opencode(project, core)
+        if ecrits:
+            print("Dossier personnel OpenCode (~/.opencode/agent) synchronise : "
+                  + ", ".join(ecrits))
+    except OSError as exc:
+        print("Avertissement : synchronisation de ~/.opencode/agent impossible (" + str(exc) + ")")
 
     # Registre des fenetres de contexte (dashboard uniquement). Jamais ecrase :
     # un projet peut declarer sa propre table de modeles, comme le fait deja
@@ -54,7 +80,8 @@ def install_project(project: Path, core: Path) -> None:
     if models.is_file() and not (opencode / "models.yaml").is_file():
         shutil.copy2(models, opencode / "models.yaml")
 
-    def main() -> int:
+
+def main() -> int:
     parser = argparse.ArgumentParser(description="Installer Sayrhazi")
     parser.add_argument("--project", default=".", help="racine du projet cible")
     args = parser.parse_args()

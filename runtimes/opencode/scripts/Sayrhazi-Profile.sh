@@ -5,7 +5,7 @@
 #   export SAYRHAZI_HOME="$HOME/sayrhazi"
 #   . "$SAYRHAZI_HOME/runtimes/opencode/scripts/Sayrhazi-Profile.sh"
 #
-# Fonctions : Sayrhazi, tunda, update, info, remove, sayrhazi-tui
+# Fonctions : Sayrhazi, tunda, update, info, remove
 #             (+ Sayrhazi-Install/Check/Update).
 # Les flags (-*, ex. --version) vont au CLI ; un chemin va à l'installeur.
 # Bash sensible à la casse : `Sayrhazi` (fonction) et `sayrhazi` (bin npm) coexistent.
@@ -24,42 +24,6 @@ Sayrhazi-Update() {
     local project="${1:-.}"
     python3 "$SAYRHAZI_HOME/engine/updater.py" --project "$project" || return
     Sayrhazi-Check "$project"
-}
-
-sayrhazi-tui() {
-    # Dashboard du projet. Le premier argument est le point de depart, pas un
-    # flag ; la racine reelle est cherchee en remontant :
-    #   sayrhazi-tui                  (projet courant)
-    #   sayrhazi-tui /chemin/projet
-    #   sayrhazi-tui . --once        (une seule capture, puis sortie)
-    # Marcher depuis `.opencode` ou un sous-dossier fonctionne donc aussi.
-    local start="."
-    if [ $# -gt 0 ]; then
-        case "$1" in
-            -*) ;;
-            *) start="$1"; shift ;;
-        esac
-    fi
-    if [ ! -d "$start" ]; then
-        echo "sayrhazi-tui : chemin introuvable ($start)." >&2
-        return 1
-    fi
-    # Remonte jusqu'a trouver un `.opencode/watch-tui.py`, comme le dashboard.
-    local dir="$start" racine=""
-    while [ -n "$dir" ]; do
-        if [ -f "$dir/.opencode/watch-tui.py" ]; then racine="$dir"; break; fi
-        [ "$dir" = "/" ] && break
-        dir="$(dirname "$dir")"
-    done
-    if [ -z "$racine" ]; then
-        echo "sayrhazi-tui : aucun projet Sayrhazi (pas de .opencode/watch-tui.py) au-dessus de $start." >&2
-        echo "  Lance d'abord 'Sayrhazi $start' pour installer." >&2
-        return 1
-    fi
-    # Le dashboard resout sa racine depuis le repertoire courant : le sous-shell
-    # change de dossier sans toucher a l'appelant, sans quoi il analyserait le
-    # dossier du terminal au lieu du projet demande.
-    ( cd "$racine" && python3 .opencode/watch-tui.py "$@" )
 }
 
 tunda() {

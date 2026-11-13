@@ -224,22 +224,17 @@ def main() -> int:
     else:
         warn("services.py absent (lance `update sayrhazi` pour l'ajouter)")
 
-    # 6c. dashboard (optionnel : necessite textual). Verifie la presence du
-    # script ET la dependance Python : sans cela, `sayrhazi-tui` echoue sur une
-    # erreur d'import opaque, sans que rien ne l'ait annonce au tunda.
-    tui = opencode / "watch-tui.py"
-    if not tui.is_file():
-        warn("watch-tui.py absent (lance `update sayrhazi` pour l'ajouter)")
+    # 6c. briques partagées (lecture OpenCode + handler web) — cœur du dashboard web.
+    modules = opencode / "sayrhazi-modules.py"
+    server = opencode / "sayrhazi-serveur.py"
+    if not modules.is_file():
+        warn("sayrhazi-modules.py absent (lance `update sayrhazi` pour l'ajouter)")
     else:
-        ok("watch-tui.py present")
-        try:
-            import importlib.util
-            if importlib.util.find_spec("textual") is None:
-                warn("dashboard inutilisable : 'textual' absent "
-                     f"({'pip' if sys.platform == 'win32' else 'pip3'} install textual)")
-        except (ImportError, ValueError):
-            warn("dashboard inutilisable : 'textual' absent "
-                 f"({'pip' if sys.platform == 'win32' else 'pip3'} install textual)")
+        ok("sayrhazi-modules.py present")
+    if not server.is_file():
+        warn("sayrhazi-serveur.py absent (lance `update sayrhazi` pour l'ajouter)")
+    else:
+        ok("sayrhazi-serveur.py present")
 
     # 6d. registre des fenetres de contexte (dashboard)
     if (opencode / "models.yaml").is_file():

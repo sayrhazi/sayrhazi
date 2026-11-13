@@ -54,16 +54,20 @@ if (-not (Test-Path -LiteralPath $workflow)) {
     Copy-Item (Join-Path $adapterRoot 'templates/workflow.yaml') $workflow
 }
 
-# Le watcher est contrôlé par Sayrhazi : il est mis à jour avec -Force.
-$watcherSource = Join-Path $adapterRoot 'scripts/watch-work.py'
-if (Test-Path -LiteralPath $watcherSource) {
-    Copy-Item $watcherSource (Join-Path $opencode 'watch-work.py') -Force
+# Moteur + briques partagées + serveur unifié (cohérent avec engine/updater.py).
+foreach ($script in @('watch-work.py', 'services.py', 'sayrhazi-modules.py', 'sayrhazi-serveur.py')) {
+    $src = Join-Path $adapterRoot "scripts/$script"
+    if (Test-Path -LiteralPath $src) {
+        Copy-Item $src (Join-Path $opencode $script) -Force
+    }
 }
 
-# Le dashboard TUI aussi (lecture seule, même cycle de vie que le watcher).
-$tuiSource = Join-Path $adapterRoot 'scripts/watch-tui.py'
-if (Test-Path -LiteralPath $tuiSource) {
-    Copy-Item $tuiSource (Join-Path $opencode 'watch-tui.py') -Force
+# Fichiers statiques du dashboard web (HTML, CSS, JS).
+$staticSource = Join-Path $adapterRoot 'scripts/static'
+$staticTarget = Join-Path $opencode 'static'
+if (Test-Path -LiteralPath $staticSource) {
+    New-Item -ItemType Directory -Path $staticTarget -Force | Out-Null
+    Copy-Item (Join-Path $staticSource '*') $staticTarget -Recurse -Force
 }
 
 # Registre des fenêtres de contexte (dashboard uniquement, surchargeable).
@@ -78,6 +82,14 @@ if ((Test-Path -LiteralPath $modelsSource) -and -not (Test-Path -LiteralPath $mo
 $servicesSource = Join-Path $adapterRoot 'scripts/services.py'
 if (Test-Path -LiteralPath $servicesSource) {
     Copy-Item $servicesSource (Join-Path $opencode 'services.py') -Force
+}
+
+# Le dossier personnel OpenCode (~/.opencode/agent) reflete le projet :
+# OpenCode y lit le `model:` de chaque agent au lancement.
+try {
+    python (Join-Path $sourceRoot 'engine\agent_sync.py') --project $resolvedProject --core $sourceRoot
+} catch {
+    Write-Host "Avertissement : synchronisation de ~/.opencode/agent impossible ($($_.Exception.Message))" -ForegroundColor Yellow
 }
 Write-Host "Sayrhazi installe dans : $resolvedProject"
     Write-Host "A completer avant usage : $config"

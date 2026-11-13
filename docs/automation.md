@@ -95,7 +95,7 @@ La mémoire d'un agent est dans ses rapports (`.opencode/resume/`, archivés dan
 
 Jusqu'à 0.12.x, le watcher réutilisait `--session` par (tâche, agent) et estimait la saturation avec `tokens_input + tokens_output + tokens_cache_write`, en **excluant `tokens_cache_read`**. Cette exclusion était fausse : la relecture de cache fait partie du contexte renvoyé à chaque appel et en représente souvent la majeure partie. La jauge tombait donc à ~0 % pendant que le panneau Context d'OpenCode affichait la valeur réelle. Retirer tout le mécanisme est plus sûr que de le corriger.
 
-## Dashboard (`watch-tui.py`)
+## Dashboard web (servi par `sayrhazi-serveur.py`)
 
 Le dashboard observe, il ne pilote rien. Pour chaque agent il liste **toutes** ses sessions sur le projet et distingue les deux origines :
 
@@ -128,14 +128,14 @@ La compaction d'OpenCode n'a pas de cas particulier : elle est marquée par un p
 
 Aucun pourcentage cumulatif n'est affiché : additionner des fenêtres de sessions différentes n'a pas de sens.
 
-OpenCode ne stocke nulle part la fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration). Sayrhazi la lit dans `core/runtime/models.yaml`, installé dans `.opencode/models.yaml` et surchargeable par projet. Modèle absent du registre → `n/d` : mieux vaut une métrique absente qu'un pourcentage silencieusement faux ; tokens et coût restent affichés. `tunda sayrhazi` contrôle la présence du registre, de `watch-tui.py` et de la dépendance `textual`, et nomme la commande d'installation adaptée à la plateforme (`pip` / `pip3`).
+OpenCode ne stocke nulle part la fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration). Sayrhazi la lit dans `core/runtime/models.yaml`, installé dans `.opencode/models.yaml` et surchargeable par projet. Modèle absent du registre → `n/d` : mieux vaut une métrique absente qu'un pourcentage silencieusement faux ; tokens et coût restent affichés. `tunda sayrhazi` contrôle la présence du registre, de `sayrhazi-modules.py` et nomme la commande d'installation adaptée à la plateforme.
 
 ### Panneau de détail
 
 Sous le tableau, un panneau suit la ligne sélectionnée (flèches du clavier ou clic, aucune touche supplémentaire). Il reprend ce que la ligne ne peut pas contenir faute de place : modèle et fenêtre, coût de session, horodatages, et surtout la **décomposition du contexte** telle qu'OpenCode l'a comptée :
 
 ```text
-modèle    opencode/muse-spark-1.3-contributor-free  ·  fenêtre 1 048 576
+modèle    opencode/inkling-2-small-free  ·  fenêtre 1 048 576
 contexte  572 128 tokens =  55 % de la fenêtre
           input 715  cache.read 570 993  cache.write 0  output 420  reasoning 0
 ```
@@ -152,7 +152,15 @@ En cas de timeout, le watcher vérifie si le rapport a quand même été produit
 
 Un Ctrl+C au repos écrit un marqueur d'arrêt propre (`.opencode/state/clean_stop`) ; un arrêt brutal (terminal fermé, processus tué) n'en laisse pas. Relancé avec `--continue`, le watcher diagnostique : marqueur présent/absent, agents retrouvés en cours dans l'état (purge), appels sans terminaison au journal, pause quota enregistrée. Puis la boucle normale reprend le travail inachevé (rapports et point 7). Sans le flag, le démarrage reste silencieux comme avant.
 
-La console colore les mots importants (agents, `task_id`, pourcentages, `ERREUR`/`ATTENTION`) et affiche le modèle de chaque agent appelé (`[muse-spark-1.3]`, lu dans le frontmatter de `.opencode/agent/*.md`) ; le journal fichier reste en texte brut, avec le nom complet du modèle. Pour la lisibilité, chaque vague de déclenchements est encadrée (`########## vague : … ##########`) et la sortie de chaque agent est encadrée (`============ AGENT · … ============` … `============ FIN · … ============`).
+La console colore les mots importants (agents, `task_id`, pourcentages, `ERREUR`/`ATTENTION`) et affiche le modèle de chaque agent appelé (`[inkling-2-small-free]`, lu dans le frontmatter de `.opencode/agent/*.md`) ; le journal fichier reste en texte brut, avec le nom complet du modèle. Pour la lisibilité, chaque vague de déclenchements est encadrée (`########## vague : … ##########`) et la sortie de chaque agent est encadrée (`============ AGENT · … ============` … `============ FIN · … ============`).
+
+## Dashboard web (servi par `sayrhazi-serveur.py`)
+
+Le dashboard web présente une interface HTML autonome sur `http://localhost:8363` (`sayrhazi server`) : état du workflow en direct, rapports d'agents détaillés (avec surlignage et diffs), sidebar listant les discussions, création de discussions pour un agent via l'API native d'OpenCode (`session_id` réel), suppression et renommage automatiques, streaming token par token du dernier tour, indicateur « L'agent est en cours… », copie du message utilisateur, pied de bulle agent (modèle et durée de tour, comme la TUI).
+
+Le serveur unifié `sayrhazi-serveur.py` assure les deux rôles dans un seul processus : servir le dashboard web et lancer/arrêter le watcher (`watch-work.py`). Le watcher est aussi accessible depuis la barre de navigation (`?start`/`?stop`). Les assets front (`static/`) sont servis avec `Cache-Control: no-store`.
+
+Les discussions sont ouvertes en bas (dernier message visible). Supprimer une discussion efface aussi les sessions enfants d'OpenCode — la suppression passe par l'endpoint natif `DELETE /session/:id`. Le renommage automatique du titre utilise l'agent natif `title` d'OpenCode, déclenché par le premier message utilisateur.
 
 ## Services séparés
 

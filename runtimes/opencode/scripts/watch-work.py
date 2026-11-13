@@ -112,7 +112,7 @@ def log(message: str) -> None:
 #     Sayrhazi <task_id> <agent> <run_id>
 #
 # Le titre est la seule chose que le watcher produit pour l'observation ; le
-# dashboard (watch-tui.py) retrouve ensuite chaque session par ce préfixe et
+# dashboard (sayrhazi-modules.py) retrouve ensuite chaque session par ce préfixe et
 # y lit les métriques qu'OpenCode a lui-même enregistrées (tokens du dernier
 # message assistant, coût de session). La mémoire d'un agent reste dans les
 # rapports (`.opencode/resume/`), pas dans un historique réinjecté.
@@ -170,6 +170,8 @@ def _color_enabled() -> bool:
     """Couleurs console uniquement (jamais journal, jamais sortie redirigée)."""
     if os.environ.get("NO_COLOR") is not None:
         return False
+    if os.environ.get("FORCE_COLOR") == "1":
+        return True
     if os.environ.get("TERM", "") == "dumb":
         return False
     try:
@@ -917,20 +919,22 @@ def classify_failure(result) -> str:
     return "other"
 
 
-def _run_branch(project_root: Path, stage: dict, task_id: str) -> Tuple[bool, str]:
+def _run_branch(project_root: Path, stage: dict, task_id: str, trigger_func=None) -> Tuple[bool, str]:
     """Exécute une transition (journal + état + déclenchement). (ok, kind)."""
     sid = stage.get("id", "?")
     journal(project_root, f"{sid} déclenchée pour {task_id}")
     state_agents_add(project_root, task_id, stage.get("agent"))
     try:
-        ok, kind = trigger_stage(project_root, stage, task_id)
+        if trigger_func is None:
+            trigger_func = trigger_stage
+        ok, kind = trigger_func(project_root, stage, task_id)
     finally:
         state_agents_remove(project_root, task_id, stage.get("agent"))
     journal(project_root, f"{sid} {'terminée' if ok else 'échouée'} pour {task_id}")
     return ok, kind
 
 
-def run_branches(project_root: Path, items: list, workers: int) -> tuple:
+def run_branches(project_root: Path, items: list, workers: int, trigger_func=None) -> tuple:
     """Exécute les transitions éligibles : séquentiel si 1, parallèle sinon.
 
     items : [(cle, stage, task_id, raison), ...]. Retourne (ok_quelconque,
@@ -941,6 +945,9 @@ def run_branches(project_root: Path, items: list, workers: int) -> tuple:
     if not items:
         return False, done, failed
 
+    if trigger_func is None:
+        trigger_func = trigger_stage
+
     sids = sorted({(stage.get("id", "?") or "?") for _k, stage, _t, _w in items})
     wave = f"vague : {', '.join(sids)} ({items[0][2]})"
     print()
@@ -950,7 +957,7 @@ def run_branches(project_root: Path, items: list, workers: int) -> tuple:
     if len(items) <= 1:
         for key, stage, task_id, why in items:
             log(f"État : {why}")
-            ok, kind = _run_branch(project_root, stage, task_id)
+            ok, kind = _run_branch(project_root, stage, task_id, trigger_func)
             if ok:
                 done.append(key)
             else:
@@ -962,14 +969,17 @@ def run_branches(project_root: Path, items: list, workers: int) -> tuple:
                 log("Échec déclenchement, on réessaiera au prochain passage.")
         return bool(done), done, failed
 
+    # Plusieurs étapes : exécution parallèle bornée par max_parallel_agents
     quota_hit = False
     quota_agent = None
+    quota_stage = None
     with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, workers),
                                                thread_name_prefix="sayrhazi") as pool:
-        futures = {pool.submit(_run_branch, project_root, stage, task_id): (key, stage.get("id", "?"))
+        futures = {pool.submit(_run_branch, project_root, stage, task_id, trigger_func): (key, stage.get("id", "?"))
                    for key, stage, task_id, _why in items}
         quota_hit = False
         quota_agent = None
+        quota_stage = None
         for future in concurrent.futures.as_completed(futures):
             key, sid = futures[future]
             try:
@@ -984,12 +994,13 @@ def run_branches(project_root: Path, items: list, workers: int) -> tuple:
                 failed.append((key, sid, kind))
                 if kind == "quota":
                     quota_hit = True
-                    quota_agent = stage.get("agent")
-                    log(f"⚠ QUOTA atteint par {stage.get('agent')} — mise en pause de la vague.")
-        if quota_hit:
-            log(f"⚠ QUOTA global détecté ({quota_agent}) — vague en pause. Attente de réinitialisation du quota.")
-            journal(project_root, f"QUOTA global : pause vague ({quota_agent})")
-            return False, done, failed
+                    quota_agent = next((s.get("agent") for k, s, _t, _w in items if k == key), None)
+                    quota_stage = next((s.get("id", "?") for k, s, _t, _w in items if k == key), sid)
+                    log(f"⚠ QUOTA atteint par {quota_agent} — mise en pause de la vague.")
+    if quota_hit:
+        log(f"⚠ QUOTA global détecté ({quota_agent}) — vague en pause. Attente de réinitialisation du quota.")
+        journal(project_root, f"QUOTA global : pause vague ({quota_agent})")
+        return False, done, failed
     names = {key: stage.get("id", "?") for key, stage, _t, _w in items}
     kinds = {key: kind for key, _sid, kind in failed}
     parts = ([f"{names[k]} OK" for k in sorted(done, key=names.get)]

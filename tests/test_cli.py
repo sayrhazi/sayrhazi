@@ -30,11 +30,23 @@ class TestCli(unittest.TestCase):
             r = subprocess.run(MAIN + ["remove", "--project", tmp], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn("Simulation", r.stdout)
-            self.assertTrue((Path(tmp) / ".opencode" / "agent" / "bamse.md").is_file())
+            # noyau installs ? agent copies ?
+            self.assertTrue((Path(tmp) / ".opencode" / "sayrhazi-serveur.py").is_file())
+            self.assertTrue((Path(tmp) / ".opencode" / "static").is_dir())
             r = subprocess.run(MAIN + ["remove", "--project", tmp, "--yes"], capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stderr)
-            self.assertFalse((Path(tmp) / ".opencode" / "agent" / "bamse.md").exists())
+            # Sayrhazi noyau retire
+            self.assertFalse((Path(tmp) / ".opencode" / "sayrhazi-serveur.py").exists())
+            self.assertFalse((Path(tmp) / ".opencode" / "sayrhazi-modules.py").exists())
+            self.assertFalse((Path(tmp) / ".opencode" / "watch-work.py").exists())
+            self.assertFalse((Path(tmp) / ".opencode" / "services.py").exists())
+            self.assertFalse((Path(tmp) / ".opencode" / "static").exists())
+            self.assertFalse((Path(tmp) / ".opencode" / "state").exists())
+            # traces volontaires conservees
+            self.assertTrue((Path(tmp) / ".opencode" / "agent" / "bamse.md").is_file())
             self.assertTrue((Path(tmp) / ".opencode" / "sayrhazi.yaml").is_file())
+            self.assertTrue((Path(tmp) / ".opencode" / "workflow.yaml").is_file())
+            self.assertTrue((Path(tmp) / ".opencode" / "models.yaml").is_file())
 
     def test_check_non_installe(self):
         with tempfile.TemporaryDirectory() as tmp:

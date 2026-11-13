@@ -10,7 +10,7 @@
 ║    \___ \ / _` | | | | '__| '_ \ / _` |_  / | |   ║
 ║     ___) | (_| | |_| | |  | | | | (_| |/ /__| |   ║
 ║    |____/ \__,_|\__, |_|  |_| |_|\__,_/_____|_|   ║
-║                 |___/  v0.14.2 - sayrhazi         ║
+║                 |___/  v0.15.0 - sayrhazi          ║
 ║                                                   ║
 ╚═══════════════════════════════════════════════════╝
 ```
@@ -137,6 +137,8 @@ Sans npm, depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.gi
 
 Le script ne supprime ni ne remplace rapports, historiques, décisions ou configuration existants. Après installation, compléter `.opencode/sayrhazi.yaml`, renseigner les règles locales (`AGENTS.md` §4), puis vérifier avec `sayrhazi tunda`.
 
+Le dashboard **web** s'ouvre sur `http://localhost:8363` via `sayrhazi server` : état du workflow, rapports d'agents détaillés, conversations avec les agents (création/suppression de discussions, titre renommé automatiquement par OpenCode, streaming token par token).
+
 ## Commandes
 
 Les crochets indiquent un argument optionnel : sans argument, la commande vise le dossier courant. Toutes s'invoquent comme `sayrhazi <commande>` et ne dépendent d'aucun profil de terminal.
@@ -149,7 +151,7 @@ Les crochets indiquent un argument optionnel : sans argument, la commande vise l
 | `sayrhazi update [chemin]` | mise à jour | Agents + watcher recopiés, migration douce + backup, version alignée, check relancé |
 | `sayrhazi info [chemin]` | renseigne | Banner + versions noyau/installé, agents présents, rapports (lecture seule) |
 | `sayrhazi remove [chemin] [--yes]` | retire prudemment | Simulation puis confirmation ; fichiers noyau seuls, jamais config/rapports/historique |
-| `sayrhazi-tui [chemin]` | dashboard | Lance `.opencode/watch-tui.py` sur le projet le plus proche (courant par défaut) ; `--once` pour une capture unique. Binaire npm sur le PATH, indépendant du profil de terminal |
+| `sayrhazi server [--port N] [--root chemin]` | dashboard web | Lance `.opencode/sayrhazi-serveur.py` : http://localhost:8363 par défaut (dashboard + conversations avec les agents) |
 | `sayrhazi --version` | version | Affiche la version du noyau |
 
 ## Zawadi et Playwright (optionnel)

@@ -37,14 +37,17 @@ if [[ ! -e "$OPENCODE_DIR/workflow.yaml" ]]; then
   cp "$ADAPTER_ROOT/templates/workflow.yaml" "$OPENCODE_DIR/workflow.yaml"
 fi
 
-# Le watcher est contrôlé par Sayrhazi : il est mis à jour à chaque install.
-if [[ -e "$ADAPTER_ROOT/scripts/watch-work.py" ]]; then
-  cp "$ADAPTER_ROOT/scripts/watch-work.py" "$OPENCODE_DIR/watch-work.py"
-fi
+# Moteur + briques partagées + serveur unifié (cohérent avec engine/updater.py).
+for script in watch-work.py services.py sayrhazi-modules.py sayrhazi-serveur.py; do
+  if [[ -e "$ADAPTER_ROOT/scripts/$script" ]]; then
+    cp "$ADAPTER_ROOT/scripts/$script" "$OPENCODE_DIR/$script"
+  fi
+done
 
-# Le dashboard TUI aussi (lecture seule, même cycle de vie que le watcher).
-if [[ -e "$ADAPTER_ROOT/scripts/watch-tui.py" ]]; then
-  cp "$ADAPTER_ROOT/scripts/watch-tui.py" "$OPENCODE_DIR/watch-tui.py"
+# Fichiers statiques du dashboard web (HTML, CSS, JS).
+if [[ -d "$ADAPTER_ROOT/scripts/static" ]]; then
+  mkdir -p "$OPENCODE_DIR/static"
+  cp -R "$ADAPTER_ROOT/scripts/static/." "$OPENCODE_DIR/static/"
 fi
 
 # Registre des fenêtres de contexte (dashboard uniquement, surchargeable).
@@ -56,6 +59,12 @@ fi
 # Le gestionnaire de services aussi (séparé du moteur d'agents).
 if [[ -e "$ADAPTER_ROOT/scripts/services.py" ]]; then
   cp "$ADAPTER_ROOT/scripts/services.py" "$OPENCODE_DIR/services.py"
+fi
+
+# Le dossier personnel OpenCode (~/.opencode/agent) reflete le projet :
+# OpenCode y lit le `model:` de chaque agent au lancement.
+if command -v python3 >/dev/null 2>&1; then
+  python3 "$SOURCE_ROOT/engine/agent_sync.py" --project "$PROJECT_PATH" --core "$SOURCE_ROOT" || true
 fi
 
 echo "Sayrhazi installé dans: $PROJECT_PATH"

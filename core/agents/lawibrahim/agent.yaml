@@ -3,7 +3,7 @@ name: Lawibrahim
 role: architect
 description: Partenaire de réflexion et architecte Sayrhazi
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/nemotron-3.5-super-vl-free)
-model: opencode/nemotron-3.5-super-vl-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
+model: opencode/inkling-2-small-free
 color: "#8B5CF6"
 display_key: agents.architect

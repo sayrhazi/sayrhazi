@@ -5,10 +5,18 @@ Usage : python tests/test_core.py
 """
 from __future__ import annotations
 
+import json
+import os
+import subprocess
 import sys
 import tempfile
+import threading
 import unittest
+import urllib.error
+import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Optional
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "engine"))
@@ -938,7 +946,7 @@ class TestParallel(unittest.TestCase):
         w.trigger_stage = stub
         items = [(f"k{i}", s, "T", f"{s['id']} prêt (T)") for i, s in enumerate(self._stages())]
         start = _time.time()
-        ok, done, failed = w.run_branches(root, items, 3)
+        ok, done, failed = w.run_branches(root, items, 3, stub)
         elapsed = _time.time() - start
         self.assertTrue(ok)
         self.assertEqual(len(done), 3)
@@ -973,7 +981,7 @@ class TestParallel(unittest.TestCase):
 
         w.trigger_stage = stub
         items = [(f"k{i}", s, "T", f"{s['id']} prêt (T)") for i, s in enumerate(self._stages())]
-        ok, done, failed = w.run_branches(root, items, 1)
+        ok, done, failed = w.run_branches(root, items, 1, stub)
         self.assertEqual(current["max"], 1)
         self.assertTrue(ok)
         self.assertEqual(len(done), 2)
@@ -1176,10 +1184,10 @@ class TestSession(unittest.TestCase):
         return module
 
     @classmethod
-    def _tui(cls, name="watch_tui"):
+    def _modules(cls, name="sayrhazi_modules"):
         import importlib.util
         spec = importlib.util.spec_from_file_location(
-            name, str(ROOT / "runtimes" / "opencode" / "scripts" / "watch-tui.py"))
+            name, str(ROOT / "runtimes" / "opencode" / "scripts" / "sayrhazi-modules.py"))
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
@@ -1224,7 +1232,7 @@ class TestSession(unittest.TestCase):
 
     def test_dashboard_formule_native(self):
         # Reproduit le panneau Context d'OpenCode : cache.read compte.
-        t = self._tui()
+        t = self._modules()
         payload = {"role": "assistant", "providerID": "opencode", "modelID": "muse",
                    "tokens": {"input": 394, "output": 141, "reasoning": 50,
                               "cache": {"read": 47217, "write": 0}}}
@@ -1232,10 +1240,11 @@ class TestSession(unittest.TestCase):
         self.assertEqual(t.message_model_key(payload), "opencode/muse")
 
     def test_dashboard_registre_modeles(self):
-        t = self._tui()
+        t = self._modules()
         limites = t.load_model_limits(ROOT)
         self.assertTrue(limites, "registre core/runtime/models.yaml vide ou introuvable")
         attendus = {
+            "opencode/inkling-2-small-free": 1048576,
             "opencode/longcat-2.5-preview-free": 1000000,
             "opencode/muse-spark-1.3-contributor-free": 1048576,
             "opencode/nemotron-3-ultra-free": 1000000,
@@ -1250,7 +1259,7 @@ class TestSession(unittest.TestCase):
 
     def test_dashboard_aucun_repli_silencieux(self):
         # Base absente : aucune session, ni auto ni manuelle.
-        t = self._tui()
+        t = self._modules()
         inexistant = "chemin/inexistant.db"
         self.assertEqual(t.find_sessions(inexistant, "/tmp", "hadji",
                                          "Sayrhazi F-1 hadji "), [])
@@ -1258,7 +1267,7 @@ class TestSession(unittest.TestCase):
     def test_dashboard_voit_les_agents_manuels(self):
         # Un agent appelle a la main (titre libre) doit apparaitre aussi :
         # seuls les appels du watcher portent le prefixe Sayrhazi.
-        t = self._tui()
+        t = self._modules()
         db, path = self._db()
         self._session(db, "ses_manual", "Ali : maquette du tableau", "ali",
                       "/proj", 1000)
@@ -1283,7 +1292,7 @@ class TestSession(unittest.TestCase):
         # Une session manuelle creee avant une session automatique peut rester
         # celle que l'utilisateur regarde (terminus ouvert) ; c'est la derniere
         # ACTIVITE qui fait foi, pas la date de creation.
-        t = self._tui()
+        t = self._modules()
         db, path = self._db()
         self._session(db, "ses_manuelle", "Ali : travail en cours", "ali",
                       "/proj", 1000, updated=9000)
@@ -1297,64 +1306,16 @@ class TestSession(unittest.TestCase):
                          "session la plus active selectionnee par time_updated")
 
     def test_dashboard_barre_sans_limite(self):
-        t = self._tui()
+        t = self._modules()
         self.assertEqual(set(t.bar(None)), {"·"})
         self.assertTrue(t.bar(0.5).startswith("█"))
 
-    def test_dashboard_une_valeur_par_colonne(self):
-        # Regression : la jauge et le nombre de tokens etaient concatenes
-        # dans une seule colonne, si bien que l'en-tete compte une case de
-        # moins que la ligne et que tout le tableau se decale.
-        t = self._tui()
 
-        class _R:
-            agent_file, role = "hadji", "reviewer"
-            usage, context_tokens, usage_pct = 0.04, 45215, "4 %"
-            calls, manual_calls = 2, 7
-            cost_session, cost_projet = "$0.01", "$0.42"
-            sid = "ebe4cb9c9f"
-            origine, report_txt, etat = "auto", "VALIDÉ", "VALIDÉ"
-
-        cellules = t.row_cells(_R())
-        self.assertEqual(len(cellules), len(t.COLUMNS),
-                         f"{len(cellules)} cellules pour {len(t.COLUMNS)} colonnes")
-        # La jauge seule dans sa colonne, les tokens seuls dans la leur.
-        jauge = t.COLUMNS.index("Jauge")
-        self.assertEqual(len(cellules[jauge]), 10)
-        self.assertTrue(set(cellules[jauge]) <= {"█", "░", "·"})
-        self.assertEqual(cellules[t.COLUMNS.index("Tokens")], "45 215")
-
-    def test_dashboard_separe_session_et_projet(self):
-        # Les deux blocs ne doivent jamais laisser croire qu'ils mesurent la
-        # meme chose : `Coût sess.` est celui de la session affichee,
-        # `Coût proj.` cumule toutes les sessions de l'agent sur le projet.
-        t = self._tui()
-
-        class _R:
-            agent_file, role = "hifadhui", "security"
-            usage, context_tokens, usage_pct = 0.05, 55467, "5 %"
-            calls, manual_calls = 1, 5
-            cost_session, cost_projet = "$0.03", "$0.99"
-            sid = "ebddd8569f"
-            origine, report_txt, etat = "auto", "VALIDÉ", "VALIDÉ AVEC RÉSERVES"
-
-        cellules = t.row_cells(_R())
-        sess = cellules[t.COLUMNS.index("Coût sess.")]
-        proj = cellules[t.COLUMNS.index("Coût proj.")]
-        self.assertEqual(sess, "$0.03", "le cout de session affiche l'historique")
-        self.assertEqual(proj, "$0.99")
-        self.assertNotEqual(sess, proj)
-        # Les deux blocs sont separes par une colonne qui ne porte aucune valeur.
-        seps = [i for i, nom in enumerate(t.COLUMNS) if nom == t.SEP]
-        self.assertTrue(seps, "aucune separation de blocs")
-        for i in seps:
-            self.assertEqual(cellules[i], f"[dim]{t.SEP}[/]",
-                             "la colonne de separation porte une valeur")
 
     def test_dashboard_detail_decoupe_le_contexte(self):
         # Le detail doit decomposer le contexte comme OpenCode l'a compte,
         # parce que `cache.read` domine et qu'une jauge seule ne dit rien.
-        t = self._tui()
+        t = self._modules()
         payload = {"role": "assistant", "finish": "stop", "providerID": "p",
                    "modelID": "m",
                    "tokens": {"input": 715, "output": 420, "reasoning": 0,
@@ -1365,29 +1326,11 @@ class TestSession(unittest.TestCase):
         self.assertEqual(sum(part.values()), t.message_context_tokens(payload),
                          "le detail ne recompte pas la formule")
 
-    def test_dashboard_detail_n_invente_rien(self):
-        # Agent jamais appele : le detail doit dire n/d, pas fabriquer un
-        # contexte, une duree ou un cout. On instancie le vrai AgentRow avec
-        # une base absente : c'est le chemin reel d'un agent sans session.
-        t = self._tui()
-        import tempfile as _tf
-        from pathlib import Path as _P
-        racine = _P(_tf.mkdtemp())
-        ligne = t.AgentRow("qa", {}, racine / "resume", "", project_root=None,
-                            model_limits={})
-        lignes = ligne.detail_lines()
-        self.assertTrue(lignes)
-        self.assertTrue(any("n/d" in l for l in lignes),
-                        f"aucune mention n/d dans {lignes}")
-        self.assertFalse(any("%" in l for l in lignes),
-                         "un pourcentage a ete invente sans mesure")
-        self.assertIsNone(ligne.context_tokens)
-        self.assertIsNone(ligne.cost_session)
 
     def test_dashboard_detail_agence_token_absente(self):
         # `tokens` present mais vide ou aberrant : jamais de division par zero
         # ni de valeur negative.
-        t = self._tui()
+        t = self._modules()
         for tokens in ({}, {"input": None}, {"cache": None}, {"input": "beaucoup"}):
             with self.subTest(tokens=tokens):
                 part = t.message_token_split({"tokens": tokens})
@@ -1396,7 +1339,7 @@ class TestSession(unittest.TestCase):
     def test_dashboard_selection_preservee_au_rafraichissement(self):
         # Regression : `table.clear()` renvoyait le curseur sur la premiere
         # ligne a chaque tick, donc le clic etait perdu en une seconde.
-        t = self._tui()
+        t = self._modules()
         self.assertIn("build-back", t.ROLE_ORDER)
         # La restauration doit se baser sur l'identite du role, pas sur
         # l'index : l'index depend de l'ordre courant des lignes.
@@ -1407,7 +1350,7 @@ class TestSession(unittest.TestCase):
         # Regression : OpenCode stocke time_created/time_updated en
         # millisecondes. Passes tels quels a format_age, le delta devenait
         # negatif, donc le detail affichait « creee 0s · active 0s » partout.
-        t = self._tui()
+        t = self._modules()
 
         class _R:
             session_row = {"time_created": 1_000_000_000_000,
@@ -1418,49 +1361,15 @@ class TestSession(unittest.TestCase):
         self.assertEqual(act["duree"], 90.0)
         self.assertEqual(t.format_span(act["duree"]), "1m30s")
 
-    def test_dashboard_etat_du_detail_non_reinitialise(self):
-        # Regression : la valeur par defaut « — » etait reappliquee apres le
-        # calcul, si bien que le detail affichait « — » pour tout agent alors
-        # que la colonne Etat montrait bien « attente ».
-        t = self._tui()
-        import tempfile as _tf
-        from pathlib import Path as _P
-        racine = _P(_tf.mkdtemp())
-        resume = racine / "resume"
-        resume.mkdir(parents=True)
-        (resume / "backend.txt").write_text(
-            "task_id: FEATURE-007\nstatus: TERMINÉ\n", encoding="utf-8")
-        ligne = t.AgentRow("build-back", {}, resume, "FEATURE-007",
-                           project_root=None, model_limits={})
-        # task_id identique au rapport -> l'etat doit etre celui du rapport.
-        self.assertEqual(ligne.etat_plain, "TERMINÉ")
-        autre = t.AgentRow("build-back", {}, resume, "FEATURE-006",
-                           project_root=None, model_limits={})
-        self.assertEqual(autre.etat_plain, "attente")
 
     def test_dashboard_format_span_au_dela_des_heures(self):
-        t = self._tui()
+        t = self._modules()
         self.assertEqual(t.format_span(45), "45s")
         self.assertEqual(t.format_span(90), "1m30s")
         self.assertEqual(t.format_span(3600), "1h00m")
         self.assertEqual(t.format_span(2 * 86400 + 3 * 3600 + 14 * 60), "2j 03h")
         self.assertEqual(t.format_span(-5), "0s")
 
-    def test_dashboard_sortie_texte_sans_balise(self):
-        # La sortie `--once` est du texte brut : le balisage Textual qui y
-        # fuirait rendrait la table illisible et fausserait l'alignement des
-        # colonnes (les balises comptent dans la largeur).
-        t = self._tui()
-        for brut, attendu in (("[dim]n/d[/]", "n/d"),
-                              ("[/]", ""),
-                              ("[dim]│[/]", "│"),
-                              ("[yellow]manuel[/]", "manuel"),
-                              ("watcher", "watcher")):
-            with self.subTest(balise=brut):
-                self.assertEqual(t.plain(brut), attendu)
-
-
-# --- Tests de robustesse 0.13.0 (sessions jetables, rapport = mémoire) ---
 
     def _db(self):
         """Base SQLite temporaire au schéma OpenCode (session + message)."""
@@ -1518,7 +1427,7 @@ class TestSession(unittest.TestCase):
 
     def test_base_inaccessible_etat_explicite(self):
         # Base absente / illisible : aucune session etrangere selectionnee.
-        t = self._tui()
+        t = self._modules()
         vide = t.find_sessions("absent.db", "/projet", "hadji", "Sayrhazi F-1 hadji ")
         self.assertEqual(vide, [])
         self.assertIsNone(t.last_assistant_message("absent.db", "ses_xyz"))
@@ -1528,7 +1437,7 @@ class TestSession(unittest.TestCase):
         # mesure rien : le message ouvert au debut d'un run (finish absent) et
         # un tour interrompu (finish "unknown", chaine non vide donc truthy).
         # Aucune des deux ne doit faire retomber la jauge a 0.
-        t = self._tui()
+        t = self._modules()
         for finish in (None, "unknown"):
             with self.subTest(finish=finish):
                 db, path = self._db()
@@ -1555,7 +1464,7 @@ class TestSession(unittest.TestCase):
         # message USER, jamais a un message assistant. Le dashboard ne doit
         # donc rien changer : il se contente de lire la baisse de contexte du
         # message assistant suivant.
-        t = self._tui()
+        t = self._modules()
         db, path = self._db()
         self._session(db, "ses_c", "Travail a faire", "build", "/proj", 1000)
         avant = {"role": "assistant", "finish": "stop", "providerID": "p",
@@ -1580,7 +1489,7 @@ class TestSession(unittest.TestCase):
     def test_message_sans_mesure_utilise_si_aucune_autre_mesure(self):
         # Aucune session n'a encore de tour mesurant : le message restant,
         # meme partiel, reste affiche plutot qu'une ligne vide.
-        t = self._tui()
+        t = self._modules()
         db, path = self._db()
         self._session(db, "ses_y", "Sayrhazi F-1 ali run-1", "ali", "/proj", 1000)
         partiel = {"role": "assistant", "finish": "tool-calls", "providerID": "p",
@@ -1595,7 +1504,7 @@ class TestSession(unittest.TestCase):
 
     def test_session_sans_mesure_aucune_il_existe(self):
         # Seuls des messages a zero : aucune mesure. On ne fabrique rien.
-        t = self._tui()
+        t = self._modules()
         db, path = self._db()
         self._session(db, "ses_z", "Sayrhazi F-1 zawadi run-1", "zawadi",
                       "/proj", 1000)
@@ -1609,7 +1518,7 @@ class TestSession(unittest.TestCase):
 
     def test_modele_absent_registre_pas_de_pourcentage(self):
         # Modele inconnu : n/d. Pas de pourcentage invente, tokens presents.
-        t = self._tui()
+        t = self._modules()
         limites = {}
         payload = {"role": "assistant", "providerID": "x", "modelID": "inconnu",
                    "tokens": {"input": 10, "output": 5, "reasoning": 0,
@@ -1622,7 +1531,7 @@ class TestSession(unittest.TestCase):
     def test_cache_dominant_conforme_panneau_opencode(self):
         # Cache.read enorme : il compte dans le contexte (c'etait le bug du
         # seuil 0.12.x, qui l'excluait).
-        t = self._tui()
+        t = self._modules()
         payload = {"role": "assistant", "providerID": "opencode", "modelID": "m",
                    "tokens": {"input": 394, "output": 141, "reasoning": 50,
                               "cache": {"read": 47217, "write": 0}}}
@@ -1680,6 +1589,682 @@ class TestSession(unittest.TestCase):
             cmd = w.build_command("hadji", "p", w.session_title("F-1", "hadji",
                                                                 w.build_run_id()), "m")
             self.assertNotIn("--session", cmd)
+
+
+class TestAssistantFooterSelection(unittest.TestCase):
+    """Selection du footer agent : reproduction de ko()/To()/Mo() d'OpenCode 1.19.0.
+
+    Ordre des messages (extrait du binaire opencode 1.19.0) :
+      - le store classe les messages par (time.created, id) : le comparateur
+        `ua` compare `time.created + id`, la fusion `b$()` trie toujours la
+        liste (`compare: ua`) et un message recu en direct est insere a la
+        position triee (recherche binaire sur `Jc`) ;
+      - la liste n'est donc JAMAIS anti-chronologique : ko() la parcourt a
+        l'envers et retient le message le PLUS RECENT de chaque tour, en
+        streaming comme apres rechargement de session.
+
+    Duree affichee : la TUI affiche la duree du TOUR (envoi du prompt -> fin
+    du tour), pas la duree propre du message.
+    """
+
+    @classmethod
+    def _charger_selecteur(cls):
+        """Charge les fonctions de selection depuis sayrhazi-serveur.py."""
+        import json
+        import re as _re
+
+        srv = ROOT / "runtimes" / "opencode" / "scripts" / "sayrhazi-serveur.py"
+        source = srv.read_text(encoding="utf-8")
+        ns = {"json": json, "re": _re, "ast": __import__("ast"),
+              "Path": Path, "Optional": __import__("typing").Optional}
+        for name in ("_format_ms", "_is_synthetic_user_message",
+                     "_has_synthetic_user_part", "_has_bash_tool",
+                     "_turn_duration_ms", "_select_assistant_footers"):
+            pattern = r"^def " + name + r"\(.*?(?=\n^def |\n^class |\Z)"
+            match = _re.search(pattern, source, _re.S | _re.M)
+            if match is None:
+                raise AssertionError("fonction introuvable : " + name)
+            exec(compile(match.group(0), "srv", "exec"), ns)
+        return ns
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ns = cls._charger_selecteur()
+
+    @staticmethod
+    def _message(mid, parent, created, completed, tools=None, synthetic=False):
+        parts = []
+        if tools:
+            for tool in tools:
+                parts.append({"type": "tool", "tool": tool, "text": "", "synthetic": False})
+        if synthetic:
+            parts.append({"type": "text", "text": "The following tool was executed by the user",
+                          "synthetic": True})
+        return {
+            "id": mid,
+            "role": "agent",
+            "parent_id": parent,
+            "created": created,
+            "completed": completed,
+            "raw_parts": parts,
+            "_msg_id": mid,
+            "_start": created,
+            "_end": completed,
+        }
+
+    @staticmethod
+    def _user(mid, created):
+        """Message utilisateur (parent du tour) : porte le time.created du tour."""
+        return {
+            "id": mid,
+            "role": "user",
+            "parent_id": "",
+            "created": created,
+            "completed": created,
+            "raw_parts": [],
+            "_msg_id": mid,
+            "_start": created,
+            "_end": created,
+        }
+
+    def test_tour_simple_message_unique(self):
+        """Un tour avec un seul message assistant : le footer est pose dessus."""
+        msgs = [self._message("a1", "u1", 1000, 4000)]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertTrue(msgs[0].get("series_end"))
+        self.assertEqual(msgs[0].get("duration"), "3.0s")
+
+    def test_ordre_chronologique_retient_le_plus_recent(self):
+        """ko() parcourt la liste a l'envers : il retient le message le plus RECENT."""
+        msgs = [
+            self._user("u1", 500),
+            self._message("a1", "u1", 1000, 21000),
+            self._message("a2", "u1", 21000, 26000),
+        ]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertIsNone(msgs[1].get("series_end"))
+        self.assertTrue(msgs[2].get("series_end"))
+        self.assertEqual(msgs[2].get("duration"), "25.5s")
+
+    def test_ordre_antichronologique_meme_selection(self):
+        """Le store natif trie toujours : l'ordre d'arrivee ne change rien.
+
+        C'est le comportement reel d'OpenCode 1.19.0 : le footer est identique
+        pendant le streaming et apres rechargement de la session.
+        """
+        chrono = [
+            self._user("u1", 500),
+            self._message("a1", "u1", 1000, 21000),
+            self._message("a2", "u1", 21000, 26000),
+        ]
+        avant = [dict(m) for m in chrono]
+        apres = [dict(m) for m in reversed(chrono)]
+        self.ns["_select_assistant_footers"](avant, set())
+        self.ns["_select_assistant_footers"](apres, set())
+        retenu_avant = [m["id"] for m in avant if m.get("series_end")]
+        retenu_apres = [m["id"] for m in apres if m.get("series_end")]
+        self.assertEqual(retenu_avant, ["a2"])
+        self.assertEqual(retenu_apres, ["a2"])
+        duree_avant = [m.get("duration") for m in avant if m.get("series_end")]
+        duree_apres = [m.get("duration") for m in apres if m.get("series_end")]
+        self.assertEqual(duree_avant, duree_apres)
+
+    def test_un_seul_footer_par_tour(self):
+        """Deux tours distincts : deux footers, un par tour."""
+        msgs = [
+            self._user("u1", 500),
+            self._message("a1", "u1", 1000, 5000),
+            self._message("a2", "u1", 5000, 7000),
+            self._user("u2", 7500),
+            self._message("b1", "u2", 8000, 11000),
+            self._message("b2", "u2", 11000, 12000),
+        ]
+        self.ns["_select_assistant_footers"](msgs, set())
+        footers = [m for m in msgs if m.get("series_end")]
+        self.assertEqual(len(footers), 2)
+        self.assertEqual({m["parent_id"] for m in footers}, {"u1", "u2"})
+
+    def test_exclusion_bash_parent_synthetique(self):
+        """To() : un assistant dont le parent est synthetique et qui contient
+        un appel bash est exclu de la selection du footer."""
+        msgs = [
+            self._message("a1", "u1", 1000, 4000, tools=["bash"]),
+            self._message("a2", "u1", 4000, 9000),
+        ]
+        self.ns["_select_assistant_footers"](msgs, {"u1"})
+        self.assertIsNone(msgs[0].get("series_end"))
+        self.assertTrue(msgs[1].get("series_end"))
+        self.assertEqual(msgs[1].get("duration"), "5.0s")
+        # si le message exclu est le dernier du tour, le tour n'a aucun footer
+        seul = [self._message("a1", "u1", 1000, 4000, tools=["bash"])]
+        self.ns["_select_assistant_footers"](seul, {"u1"})
+        self.assertIsNone(seul[0].get("series_end"))
+
+    def test_bash_avec_parent_reel_conserve_le_footer(self):
+        """Un appel bash avec un parent utilisateur reel n'exclut PAS le message."""
+        msgs = [self._message("a1", "u1", 1000, 4000, tools=["bash"])]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertTrue(msgs[0].get("series_end"))
+        self.assertEqual(msgs[0].get("duration"), "3.0s")
+
+    def test_message_sans_completed_sans_footer(self):
+        """Un message assistant sans `completed` ne porte pas de footer."""
+        msgs = [self._message("a1", "u1", 1000, None)]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertIsNone(msgs[0].get("series_end"))
+
+    def test_completed_inferieur_a_created_sans_footer(self):
+        """`completed <= created` : pas de footer (comme la TUI)."""
+        msgs = [self._message("a1", "u1", 5000, 4000)]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertIsNone(msgs[0].get("series_end"))
+
+    def test_format_duree_natif_opencode(self):
+        """Le formateur de duree est identique a r() d'OpenCode 1.19.0."""
+        fmt = self.ns["_format_ms"]
+        self.assertEqual(fmt(12), "12ms")
+        self.assertEqual(fmt(999), "999ms")
+        self.assertEqual(fmt(1000), "1.0s")
+        self.assertEqual(fmt(2830), "2.8s")
+        self.assertEqual(fmt(59800), "59.8s")
+        self.assertEqual(fmt(60000), "1m 0s")
+        self.assertEqual(fmt(83400), "1m 23s")
+        self.assertEqual(fmt(3600000), "1h 0m")
+        self.assertEqual(fmt(86400000), "1d 0h")
+
+    def test_duree_affichee_est_la_duree_du_tour(self):
+        """La TUI affiche la duree du tour, pas la duree propre du message.
+
+        Tour = max(time.completed du tour) - time.created du message
+        utilisateur qui a ouvert le tour (Mt() du client OpenCode).
+        """
+        msgs = [
+            self._user("u1", 500),
+            self._message("a1", "u1", 1000, 21000),    # 20.0s
+            self._message("a2", "u1", 21000, 26000),    # 5.0s
+        ]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertTrue(msgs[2].get("series_end"))
+        self.assertEqual(msgs[2].get("duration"), "25.5s")
+
+    def test_duree_propre_si_message_utilisateur_absent(self):
+        """Sans message utilisateur (tour tronque), on garde la duree du message."""
+        msgs = [self._message("a1", "u1", 1000, 4000)]
+        self.ns["_select_assistant_footers"](msgs, set())
+        self.assertTrue(msgs[0].get("series_end"))
+        self.assertEqual(msgs[0].get("duration"), "3.0s")
+
+    def test_durees_modules_session_de_reference(self):
+        """Durees de la session de reference : identiques a la TUI.
+
+        Session ses_f2482502cffebNKNmFzECK9Fwe (7 derniers tours), valeurs
+        affichees par la TUI OpenCode : 50.8s / 47.0s / 31.8s / 20.2s /
+        48.5s / 31.1s / 1m 2s. La duree propre du dernier message de chaque
+        tour (4.9s / 3.6s / 31.4s / 11.9s / 8.2s / 30.8s / 1m 2s) est celle
+        qu'affichait le dashboard avant correction.
+        """
+        tours = [
+            ("u1", 1791792696052, [
+                ("a1", 1791792697131, 1791792717822),
+                ("a2", 1791792717968, 1791792721357),
+                ("a3", 1791792721509, 1791792724754),
+                ("a4", 1791792724877, 1791792728008),
+                ("a5", 1791792728103, 1791792731354),
+                ("a6", 1791792731473, 1791792734676),
+                ("a7", 1791792734845, 1791792738164),
+                ("a8", 1791792738360, 1791792741809),
+                ("a9", 1791792741979, 1791792746900),
+            ]),
+            ("u2", 1791793012525, [
+                ("b1", 1791793012578, 1791793031514),
+                ("b2", 1791793031553, 1791793043304),
+                ("b3", 1791793043340, 1791793047767),
+                ("b4", 1791793047804, 1791793055834),
+                ("b5", 1791793055874, 1791793059478),
+            ]),
+            ("u3", 1793953961642, [
+                ("c1", 1793953962069, 1793953993422),
+            ]),
+            ("u4", 1793954124142, [
+                ("d1", 1793954124467, 1793954132178),
+                ("d2", 1793954132403, 1793954144302),
+            ]),
+            ("u5", 1793954297284, [
+                ("e1", 1793954297559, 1793954306647),
+                ("e2", 1793954306982, 1793954315591),
+                ("e3", 1793954315830, 1793954326607),
+                ("e4", 1793954326780, 1793954331605),
+                ("e5", 1793954331815, 1793954337505),
+                ("e6", 1793954337625, 1793954345776),
+            ]),
+            ("u6", 1794079849524, [
+                ("f1", 1794079849770, 1794079880617),
+            ]),
+            ("u7", 1794080118459, [
+                ("g1", 1794080118573, 1794080181007),
+            ]),
+        ]
+        attendus = ["50.8s", "47.0s", "31.8s", "20.2s", "48.5s", "31.1s", "1m 2s"]
+        attendus_avant = ["4.9s", "3.6s", "31.4s", "11.9s", "8.2s", "30.8s", "1m 2s"]
+
+        msgs = []
+        for uid, user_created, assistants in tours:
+            msgs.append(self._user(uid, user_created))
+            for mid, created, completed in assistants:
+                msgs.append(self._message(mid, uid, created, completed))
+
+        self.ns["_select_assistant_footers"](msgs, set())
+        footers = [m for m in msgs if m.get("series_end")]
+        self.assertEqual(len(footers), 7)
+        self.assertEqual([m.get("duration") for m in footers], attendus)
+        fmt = self.ns["_format_ms"]
+        for (uid, _user_created, assistants), footer, attendu_avant in zip(tours, footers, attendus_avant):
+            # le footer est pose sur le message le plus RECENT de chaque tour
+            self.assertEqual(footer["id"], assistants[-1][0])
+            self.assertEqual(footer["parent_id"], uid)
+            # l'ancien dashboard affichait la duree propre de ce message
+            self.assertEqual(fmt(assistants[-1][2] - assistants[-1][1]), attendu_avant)
+
+    def test_selection_equivalent_ko_opencode(self):
+        """Notre selection reproduit ko() applique a la liste du store natif.
+
+        La liste du store est triee par (time.created, id) : ko() retient le
+        message le plus RECENT de chaque tour.
+        """
+        chrono = [
+            self._user("u1", 500),
+            self._message("a1", "u1", 1000, 21000),
+            self._message("a2", "u1", 21000, 31000),
+            self._message("a3", "u1", 31000, 36000),
+        ]
+        msgs = [dict(m) for m in chrono]
+        self.ns["_select_assistant_footers"](msgs, set())
+        retenu = [m["id"] for m in msgs if m.get("series_end")]
+        self.assertEqual(retenu, ["a3"])
+
+
+class _StubOpenCodeHandler(BaseHTTPRequestHandler):
+    """Faux serveur OpenCode : enregistre les appels et repond comme l'API native."""
+
+    calls = []
+
+    def log_message(self, fmt, *args):  # silence les logs du test
+        pass
+
+    def _record(self):
+        length = int(self.headers.get("Content-Length", 0) or 0)
+        raw = self.rfile.read(length) if length else b""
+        body = json.loads(raw.decode("utf-8")) if raw else None
+        type(self).calls.append({
+            "method": self.command,
+            "path": self.path,
+            "body": body,
+        })
+        return body
+
+    def _send(self, status, payload=None):
+        raw = b"" if payload is None else json.dumps(payload).encode("utf-8")
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(raw)))
+        self.end_headers()
+        if raw:
+            self.wfile.write(raw)
+
+    def do_POST(self):
+        self._record()
+        if self.path.split("?")[0] == "/session":
+            self._send(200, {
+                "id": "ses_stub00000000000000000000",
+                "title": "New session - 2026-11-12T13:00:00.000Z",
+                "agent": (self.calls[-1]["body"] or {}).get("agent", ""),
+                "directory": "C:/tmp/projet",
+            })
+            return
+        if self.path.split("?")[0].endswith("/prompt_async"):
+            self._send(204)
+            return
+        self._send(404, {"error": "inconnu"})
+
+    def do_DELETE(self):
+        self._record()
+        self._send(200, True)
+
+    def do_GET(self):
+        self._record()
+        self._send(200, {"id": "ses_stub00000000000000000000",
+                         "title": "Titre natif", "agent": "ali"})
+
+
+class TestChatSessionApi(unittest.TestCase):
+    """Gestion native des discussions OpenCode (creation, renommage, suppression).
+
+    Sayrhazi ne fabrique aucun identifiant de session : tout passe par
+    l'API native d'OpenCode (`POST /session`, `POST /session/:id/prompt_async`,
+    `DELETE /session/:id`). La session est creee SANS titre pour que
+    l'agent natif `title` d'OpenCode la renomme apres le premier message.
+    """
+
+    @classmethod
+    def _charger_serveur(cls):
+        """Charge la classe OpenCodeServer et les helpers depuis sayrhazi-serveur.py."""
+        import json as _json
+        import re as _re
+
+        srv = ROOT / "runtimes" / "opencode" / "scripts" / "sayrhazi-serveur.py"
+        source = srv.read_text(encoding="utf-8")
+        ns = {
+            "json": _json,
+            "re": _re,
+            "os": os,
+            "subprocess": subprocess,
+            "urllib": urllib,
+            "Path": Path,
+            "Optional": Optional,
+            "IS_WINDOWS": True,
+            "__name__": "sayrhazi_serveur_test",
+        }
+        patterns = [
+            r"^class OpenCodeServer:.*?(?=\n^class |\n^def |\Z)",
+            r"^def _is_default_session_title\(.*?(?=\n^def |\n^class |\Z)",
+        ]
+        for pattern in patterns:
+            match = _re.search(pattern, source, _re.S | _re.M)
+            if match is None:
+                raise AssertionError("bloc introuvable : " + pattern)
+            exec(compile(match.group(0), "srv", "exec"), ns)
+        return ns
+
+    @classmethod
+    def setUpClass(cls):
+        cls.ns = cls._charger_serveur()
+        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), _StubOpenCodeHandler)
+        cls.port = cls.httpd.server_address[1]
+        cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.httpd.shutdown()
+        cls.httpd.server_close()
+
+    def setUp(self):
+        _StubOpenCodeHandler.calls = []
+        self.server = self.ns["OpenCodeServer"](Path("C:/tmp/projet"), self.port)
+
+    def test_creation_sans_titre_pour_le_renommage_natif(self):
+        """La session est creee par OpenCode, sans titre : l'agent natif
+        `title` pourra la renommer apres le premier message."""
+        sc, result = self.server.create_session("ali", "C:/tmp/projet")
+        self.assertEqual(sc, 200)
+        self.assertTrue(result["id"].startswith("ses_"))
+        call = _StubOpenCodeHandler.calls[-1]
+        self.assertEqual(call["method"], "POST")
+        self.assertTrue(call["path"].startswith("/session?directory="))
+        self.assertIn("C%3A/tmp/projet", call["path"])
+        self.assertEqual(call["body"], {"agent": "ali"})
+        self.assertNotIn("title", call["body"])
+
+    def test_creation_renvoie_le_vrai_session_id(self):
+        """L'identifiant renvoyé par Sayrhazi est celui d'OpenCode (ses_...)."""
+        sc, result = self.server.create_session("ali", "C:/tmp/projet")
+        self.assertEqual(sc, 200)
+        self.assertEqual(result["id"], "ses_stub00000000000000000000")
+
+    def test_premier_message_au_format_parts_natif(self):
+        """OpenCode 1.19 attend `parts` (le champ `message` a disparu) et
+        l'agent doit être transmis pour que la session reste rattachée."""
+        sc, _ = self.server.prompt_async("ses_abc", "bonjour", "ali", "C:/tmp/projet")
+        self.assertEqual(sc, 204)
+        call = _StubOpenCodeHandler.calls[-1]
+        self.assertEqual(call["method"], "POST")
+        self.assertTrue(call["path"].startswith("/session/ses_abc/prompt_async"))
+        self.assertEqual(call["body"], {
+            "agent": "ali",
+            "parts": [{"type": "text", "text": "bonjour"}],
+        })
+        self.assertNotIn("message", call["body"])
+
+    def test_suppression_native_delete(self):
+        """La suppression passe par DELETE /session/:id (jamais par SQLite)."""
+        sc, result = self.server.delete_session("ses_abc", "C:/tmp/projet")
+        self.assertEqual(sc, 200)
+        self.assertTrue(result)
+        call = _StubOpenCodeHandler.calls[-1]
+        self.assertEqual(call["method"], "DELETE")
+        self.assertTrue(call["path"].startswith("/session/ses_abc?directory="))
+
+    def test_lecture_native_de_la_session(self):
+        """GET /session/:id restitue le titre (renommage) et l'agent."""
+        sc, result = self.server.get_session("ses_abc", "C:/tmp/projet")
+        self.assertEqual(sc, 200)
+        self.assertEqual(result["title"], "Titre natif")
+        self.assertEqual(result["agent"], "ali")
+
+    def test_titre_par_defaut_opencode(self):
+        """Le titre par défaut d'OpenCode est reconnu (discussion pas encore nommée)."""
+        est_defaut = self.ns["_is_default_session_title"]
+        self.assertTrue(est_defaut("New session - 2026-11-12T13:00:00.000Z"))
+        self.assertTrue(est_defaut("Child session - 2026-11-12T13:00:00.000Z"))
+        self.assertTrue(est_defaut(""))
+        self.assertFalse(est_defaut("Définition d'un test unitaire"))
+
+    def test_repertoire_normalise_dans_la_requete(self):
+        """Le répertoire transmis est normalisé en barres obliques."""
+        self.server.create_session("ali", "C:\\tmp\\projet")
+        path = _StubOpenCodeHandler.calls[-1]["path"]
+        self.assertNotIn("\\", path)
+        self.assertIn("C%3A/tmp/projet", path)
+
+
+class TestChatFrontEnd(unittest.TestCase):
+    """Comportements du front-end du dashboard chat (simulation Node).
+
+    Deux régressions ne sont visibles que dans le navigateur :
+      - deux rechargements concurrents de la barre latérale (création de
+        session + événement `session.created`) affichaient les discussions
+        en double ;
+      - après l'envoi d'un message, rien n'indiquait que l'agent travaillait.
+
+    Le test lance la simulation `tests/chat_frontend_sim.js` (Node, sans
+    dépendance) et l'ignore si Node n'est pas installé.
+    """
+
+    def test_simulation_front_end_chat(self):
+        import shutil
+        import subprocess
+
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("Node absent : simulation front-end ignoree")
+        script = ROOT / "tests" / "chat_frontend_sim.js"
+        target = ROOT / "runtimes" / "opencode" / "scripts" / "static" / "sayrhazi-server.js"
+        if not script.is_file() or not target.is_file():
+            self.skipTest("fichiers front-end introuvables")
+        proc = subprocess.run(
+            [node, str(script), str(target)],
+            capture_output=True, text=True, timeout=120,
+        )
+        sortie = (proc.stdout or "") + (proc.stderr or "")
+        self.assertNotIn("FAIL", sortie, sortie)
+        self.assertIn("OK :", sortie, sortie)
+
+
+class TestInstallerCopieLesFichiersDuDashboard(unittest.TestCase):
+    """L'installateur doit copier le serveur unifie et ses fichiers statiques.
+
+    Sans cela, `sayrhazi server` n'a pas de script a lancer dans un projet
+    neuf (seul `sayrhazi update` les copiait).
+    """
+
+    def test_installation_copie_serveur_et_statique(self):
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "sayrhazi_installer", ROOT / "engine" / "installer.py")
+        installer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(installer)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            projet = Path(tmp)
+            installer.install_project(projet, ROOT)
+            opencode = projet / ".opencode"
+            self.assertTrue((opencode / "sayrhazi-serveur.py").is_file())
+            self.assertTrue((opencode / "sayrhazi-modules.py").is_file())
+            self.assertTrue((opencode / "watch-work.py").is_file())
+            self.assertTrue((opencode / "services.py").is_file())
+            static = opencode / "static"
+            self.assertTrue(static.is_dir())
+            for nom in ("index.html", "style.css", "sayrhazi-server.js"):
+                self.assertTrue((static / nom).is_file(), nom)
+
+    def test_installation_ne_supprime_pas_les_rapports(self):
+        """L'installateur ne touche jamais aux rapports ni à l'historique."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location(
+            "sayrhazi_installer", ROOT / "engine" / "installer.py")
+        installer = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(installer)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            projet = Path(tmp)
+            rapport = projet / ".opencode" / "resume" / "build.txt"
+            rapport.parent.mkdir(parents=True)
+            rapport.write_text("contenu a preserver\n", encoding="utf-8")
+            historique = projet / ".opencode" / "history" / "log.md"
+            historique.parent.mkdir(parents=True)
+            historique.write_text("entree a preserver\n", encoding="utf-8")
+
+            installer.install_project(projet, ROOT)
+            self.assertTrue(rapport.is_file())
+            self.assertIn("a preserver", rapport.read_text(encoding="utf-8"))
+            self.assertTrue(historique.is_file())
+            self.assertIn("a preserver", historique.read_text(encoding="utf-8"))
+
+
+class TestSyncHomeOpenCode(unittest.TestCase):
+    """Synchronisation du dossier personnel OpenCode (`~/.opencode/agent`).
+
+    OpenCode lit le `model:` de chaque agent dans ce dossier au lancement :
+    tout changement (modèle, instruction) côté projet doit s'y répercuter,
+    sur tout environnement (Windows/Linux, `Path.home()`).
+    """
+
+    @classmethod
+    def _noyau(cls):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "sayrhazi_agent_sync", ROOT / "engine" / "agent_sync.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    def test_sync_cree_le_dossier_si_absent(self):
+        import shutil
+        s = self._noyau()
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projet"
+            (project / ".opencode" / "agent").mkdir(parents=True)
+            kern = ROOT / "runtimes" / "opencode" / "agents"
+            shutil.copy2(kern / "ali.md", project / ".opencode" / "agent" / "ali.md")
+            home = Path(tmp) / "home_qui_nexiste_pas"
+            ecrits = s.sync_home_opencode(project, ROOT, home)
+            # La fiche du projet fait foi pour ali.md ; les autres sont
+            # reprises du noyau : le dossier personnel est complet.
+            self.assertEqual(sorted(ecrits), sorted(f.name for f in kern.glob("*.md")))
+            self.assertTrue((home / ".opencode" / "agent" / "ali.md").is_file())
+
+    def test_sync_projet_fait_foi_model_inclus(self):
+        import shutil
+        s = self._noyau()
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projet"
+            agent_dir = project / ".opencode" / "agent"
+            agent_dir.mkdir(parents=True)
+            kern = ROOT / "runtimes" / "opencode" / "agents"
+            for f in sorted(kern.glob("*.md")):
+                shutil.copy2(f, agent_dir / f.name)
+            # Modèle personnalisé dans la fiche du projet
+            (agent_dir / "ali.md").write_text(
+                "---\nid: ali\nmodel: opencode/model-test-inkling\n---\n\n# Ali\n",
+                encoding="utf-8")
+            home = Path(tmp) / "home"
+            s.sync_home_opencode(project, ROOT, home)
+            self.assertIn("model-test-inkling",
+                          (home / ".opencode" / "agent" / "ali.md").read_text(encoding="utf-8"))
+
+    def test_sync_noyau_si_fiche_projet_absente(self):
+        s = self._noyau()
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projet"
+            (project / ".opencode").mkdir(parents=True)  # pas de dossier agent
+            home = Path(tmp) / "home"
+            ecrits = s.sync_home_opencode(project, ROOT, home)
+            self.assertEqual(sorted(ecrits), sorted(f.name for f in
+                                    (ROOT / "runtimes" / "opencode" / "agents").glob("*.md")))
+            for name in ecrits:
+                self.assertTrue((home / ".opencode" / "agent" / name).is_file())
+
+    def test_sync_ne_supprime_pas_les_autres_agents(self):
+        import shutil
+        s = self._noyau()
+        with tempfile.TemporaryDirectory() as tmp:
+            project = Path(tmp) / "projet"
+            (project / ".opencode" / "agent").mkdir(parents=True)
+            kern = ROOT / "runtimes" / "opencode" / "agents"
+            shutil.copy2(kern / "ali.md", project / ".opencode" / "agent" / "ali.md")
+            home_agent = Path(tmp) / "home" / ".opencode" / "agent"
+            home_agent.mkdir(parents=True)
+            (home_agent / "mon-outil.md").write_text("perso\n", encoding="utf-8")
+            s.sync_home_opencode(project, ROOT, Path(tmp) / "home")
+            self.assertEqual((home_agent / "mon-outil.md").read_text(encoding="utf-8"), "perso\n")
+
+
+class TestHomeSyncInstallerUpdate(unittest.TestCase):
+    """`sayrhazi` (install) et `sayrhazi update` synchronisent ~/.opencode/agent.
+
+    Vérifié via le chemin complet des scripts (subprocess) avec un home
+    temporaire (HOME / USERPROFILE surchargés).
+    """
+
+    def _env_home(self, tmp):
+        env = dict(os.environ)
+        env["HOME"] = str(tmp)
+        env["USERPROFILE"] = str(tmp)
+        return env
+
+    def test_install_puis_update_synchronise_le_dossier_personnel(self):
+        import subprocess
+
+        with tempfile.TemporaryDirectory() as tmp:
+            maison = Path(tmp) / "home"
+            maison.mkdir()
+            projet = Path(tmp) / "projet"
+            projet.mkdir()
+            env = self._env_home(maison)
+            installer = ROOT / "engine" / "installer.py"
+            updater = ROOT / "engine" / "updater.py"
+
+            r1 = subprocess.run([sys.executable, str(installer), "--project", str(projet)],
+                                capture_output=True, text=True, timeout=120, env=env)
+            self.assertEqual(r1.returncode, 0, r1.stdout + r1.stderr)
+            home_agents = maison / ".opencode" / "agent"
+            for name in ("ali.md", "bamse.md", "hadji.md", "hifadhui.md", "lawibrahim.md", "zawadi.md"):
+                self.assertTrue((home_agents / name).is_file(), name)
+
+            # Changer le modèle dans la fiche du projet puis mettre à jour
+            ali = projet / ".opencode" / "agent" / "ali.md"
+            avant = ali.read_text(encoding="utf-8")
+            apres = avant.replace("model: opencode/inkling-2-small-free",
+                                  "model: opencode/test-modele-x")
+            self.assertNotEqual(avant, apres)  # la fiche contient bien le modèle du noyau
+            ali.write_text(apres, encoding="utf-8")
+            r2 = subprocess.run([sys.executable, str(updater), "--project", str(projet)],
+                                capture_output=True, text=True, timeout=120, env=env)
+            self.assertEqual(r2.returncode, 0, r2.stdout + r2.stderr)
+            self.assertIn("model: opencode/test-modele-x",
+                          (home_agents / "ali.md").read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

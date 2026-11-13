@@ -28,8 +28,14 @@ Ce projet utilise le workflow Sayrhazi. Les agents lisent `.opencode/sayrhazi.ya
 - Statuts (`TERMINÃ‰` = achÃ¨vement, `VALIDÃ‰` = verdict) : Lawibrahim `Ã€ IMPLÃ‰MENTER / INFORMATIF / VALIDÃ‰`, Bamse `EN COURS / TERMINÃ‰ / BLOQUÃ‰`, Ali `PROPOSÃ‰ / VALIDÃ‰`, Hadji et Hifadhui `VALIDÃ‰ / VALIDÃ‰ AVEC RÃ‰SERVES / CORRECTIONS NÃ‰CESSAIRES`, Zawadi ajoute `Ã€ COMPLÃ‰TER`.
 - Aucun secret, token ou mot de passe dans les rapports.
 
-## 4. RÃ¨gles locales du projet â€” Ã€ COMPLÃ‰TER
+## 4. Versionnement et CHANGELOG
 
+- La source de verite est la premiere section ## X.Y.Z de CHANGELOG.md a la racine du noyau Sayrhazi.
+- Separez le numero de version de la date par un trait d'union simple - (pas de trait cadratin) : ## X.Y.Z - AAAA-MM-JJ.
+- Apres avoir ajoute une section, executez python engine/bump_version.py pour aligner VERSION, pyproject.toml, package.json, package-lock.json, le template sayrhazi.yaml et la banneire README.md.
+- Les versions vivent uniquement dans VERSION, CHANGELOG.md, les tags Git et les releases GitHub (jamais dans le message de commit).
+
+## 5. 
 Ajouter ici les rÃ¨gles propres Ã  ce projet (stack, conventions, architecture, commandes spÃ©cifiques, exigences qualitÃ©) :
 
 - ...
