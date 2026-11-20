@@ -14,6 +14,7 @@ Usage :
 
 import argparse
 import ast
+import base64
 import importlib
 import io
 import json
@@ -395,6 +396,49 @@ class OpenCodeServer:
                     continue
                 if not att.get("path"):
                     continue
+                raw_path = str(att.get("path"))
+                base = Path(root) if root else Path.cwd()
+                full = Path(raw_path)
+                if not full.is_absolute():
+                    full = base / full
+                if not full.exists():
+                    continue
+                try:
+                    if full.is_dir():
+                        entries = sorted(full.iterdir(), key=lambda p: p.name.lower())
+                        lines = []
+                        for i, entry in enumerate(entries):
+                            if i >= 200:
+                                lines.append("...")
+                                break
+                            lines.append(("📁 " if entry.is_dir() else "📄 ") + entry.name)
+                        content = "\n".join(lines) or "(répertoire vide)"
+                        is_dir = True
+                    else:
+                        content = full.read_text(encoding="utf-8", errors="replace")
+                        is_dir = False
+                except OSError:
+                    continue
+                mime = "text/plain"
+                data_url = "data:text/plain;base64," + base64.b64encode(content.encode("utf-8")).decode("ascii")
+                mention_value = "@" + raw_path
+                mention_start = message.find(mention_value)
+                if mention_start < 0:
+                    mention_start = len(message)
+                parts.append({
+                    "type": "file",
+                    "mime": mime,
+                    "url": data_url,
+                    "filename": full.name or raw_path,
+                    "directory": is_dir,
+                    "source": {
+                        "type": "file",
+                        "text": {"value": mention_value, "start": mention_start,
+                                 "end": mention_start + len(mention_value)},
+                        "path": raw_path,
+                    },
+                })
+                continue
 
         payload = {"parts": parts}
         if agent:
@@ -1469,10 +1513,17 @@ def _part_to_item(payload, ctx, part_id=""):
                     params.append(f"{key}={val}" if key != "pattern" else f"pattern={val}")
         params_text = ", ".join(params)
 
+        source_path = ""
+        source_obj = payload.get("source")
+        if isinstance(source_obj, dict):
+            source_path = str(source_obj.get("path") or "")
+
         tool_item = {
             "kind": "tool",
             "tool": tool_name,
             "file": file_path,
+            "directory": bool(payload.get("directory")),
+            "source_path": source_path,
             "params": params_text,
             "url": file_url,
             "mime": file_mime,
