@@ -72,7 +72,8 @@ Extraits de la spécification OpenAPI exposée par le serveur local
 | `message.part.removed` | `{sessionID, messageID, partID}` | part retiré |
 | `session.created` / `session.updated` / `session.deleted` | `{sessionID, info}` | cycle de vie d'une discussion (déjà utilisé) |
 | `session.idle` | `{sessionID}` | fin de tour : l'agent a fini |
-| `session.error` / `session.status` | `{sessionID, …}` | erreur / état |
+| `session.status` | `{sessionID, status}` | `busy` / `idle` / `retry` (boucle de retry interne) |
+| `session.error` | `{sessionID, error}` | erreur définitive du tour |
 
 Le flux `/event` est **global au répertoire** (pas par session) : le proxy doit
 filtrer avant de relayer, sinon le dashboard reçoit le bruit des autres
@@ -90,14 +91,31 @@ OpenCode.
 | `tool` | `state` = `{status: pending\|running\|completed\|error, title, input, output, metadata, time{start,end}, error}` |
 | `step-start` / `step-finish` | marqueurs d'étape, à ignorer |
 | `file` | pièce jointe |
+| `retry` | RetryPart : `attempt`, `time`, `error` (name/data) — relayée pour le bandeau d'erreur transitoire |
 
 C'est **exactement** la structure que le backend convertit déjà en `items`
 (`kind: reasoning` / `text` / `tool`) quand il relit une session
 (`_handle_chat_session_messages`).
 
+### Les erreurs upstream relayées
+
+Le relais distingue deux cas pour alimenter le bandeau au-dessus du composer :
+
+- **Retry transitoire** (`session.status` `type:"retry"` ou part `type:"retry"`) :
+  `{kind:"retry", sessionID, attempt, message, next}` — `next` est un epoch ms.
+  L'agent travaille encore ; le bouton Stop reste actif pour couper la boucle.
+  Le bandeau disparaît dès la reprise (premier `part`/`text_delta`).
+- **Erreur définitive** (`session.error`, ou `message.updated` portant `info.error`
+  sur un assistant `completed`) : `{kind:"error", sessionID, name, statusCode,
+  message, isRetryable, responseBody}`. Le tour est fini : le bandeau rouge s'affiche
+  avec un bouton `(i)` qui ouvre la modale des détails (nom d'erreur, statusCode,
+  message, `responseBody` brut en `<pre>`). Persiste jusqu'au prochain message envoyé
+  et réapparaît au rechargement de la discussion si le dernier message assistant
+  porte `info.error`.
+
 ## Deux architectures possibles
 
-### A — le front-end consomme les événements natifs
+### A - le front-end consomme les événements natifs
 
 Le proxy `/api/chat/session/event` relaie déjà `/event` : il suffit d'écrire
 un routeur d'événements 1.19 en JavaScript (`message.part.delta` → concaténer
@@ -105,7 +123,7 @@ le delta dans le nœud du part ; `message.part.updated` → créer ou remplacer
 l'item ; `message.updated` avec `time.completed` → poser le footer ;
 `session.idle` → retirer l'indicateur), plus un index `partID → nœud DOM`.
 
-### B — le backend traduit vers un format « dashboard » (recommandé)
+### B - le backend traduit vers un format « dashboard » (recommandé)
 
 Le backend relaie `/event`, filtre sur la session demandée et réémet des
 événements internes (`{kind:"text_delta", partID, delta}`,
@@ -116,27 +134,27 @@ consommer.
 `_handle_chat_session_messages`. En A, il faudrait la réécrire en JavaScript
 et on aurait **deux implémentations du rendu** susceptibles de diverger : le
 DOM « live » (événements) et le DOM « après rechargement » (relecture des
-parts en base). En B, les deux passent par le même code de conversion — il
+parts en base). En B, les deux passent par le même code de conversion - il
 suffit de factoriser `part_to_item(part)` et de l'utiliser aux deux
 endroits. Le format de transport reste aussi indépendant des révisions
 d'OpenCode.
 
 ## Plan d'implémentation (option B)
 
-1. **Backend** — factoriser la conversion d'un part en item (extraction de
+1. **Backend** - factoriser la conversion d'un part en item (extraction de
    `state`, `input`/`output`, diff, todos) dans une fonction réutilisable par
    la relecture et par le flux.
-2. **Backend** — nouveau handler SSE `GET /api/chat/stream?session_id=…` :
+2. **Backend** - nouveau handler SSE `GET /api/chat/stream?session_id=…` :
    il s'abonne à `/event?directory=…` (même mécanisme que le proxy existant),
    filtre sur la session et ne relaie que les événements utiles.
-3. **Backend** — accumulation des deltas par `partID` (le store natif fait
+3. **Backend** - accumulation des deltas par `partID` (le store natif fait
    de même avec sa table `part_text_accum_delta`) pour émettre des deltas
    propres, ou émettre le texte complet à chaque `message.part.updated`.
-4. **Front-end** — un `EventSource` sur `/api/chat/stream`, un handler qui
+4. **Front-end** - un `EventSource` sur `/api/chat/stream`, un handler qui
    **remplace** l'item correspondant (jamais d'ajout), et à `session.idle` /
    `message.updated` avec `time.completed`, la pose du footer avec la
    **durée de tour** (règle déjà implémentée dans `_select_assistant_footers`).
-5. **Nettoyage** — l'ancien code SSE (`handleMessageUpdated`,
+5. **Nettoyage** - l'ancien code SSE (`handleMessageUpdated`,
    `handleSessionStatus`, `handlePermissionAsked`…) est écrit pour le format
    périmé : l'adapter ou le supprimer, pour éviter deux moteurs d'événements
    qui cohabitent.
@@ -154,7 +172,7 @@ d'OpenCode.
 - **Raisonnement** : les parts `reasoning` arrivent eux aussi en deltas.
 - **Défilement** : ne pas forcer le scroll si l'utilisateur est remonté.
 - **Charge** : `/event` est un flux par projet ; le relais doit rester filtré.
-- **Reprise** : en cas de reconnexion, repartir d'un instantané — l'endpoint
+- **Reprise** : en cas de reconnexion, repartir d'un instantané - l'endpoint
   `GET /api/chat/session/:id/messages` existe déjà et fait foi.
 
 ## Granularité : deux niveaux possibles

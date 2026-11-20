@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""State Sayrhazi — lecture/ecriture de .opencode/state/workflow-state.yaml.
+"""State Sayrhazi - lecture/ecriture de .opencode/state/workflow-state.yaml.
 
 Fondation (lots automation) : vue de coordination {task_id, status,
 current/completed/pending/blocked, running}. Les rapports restent les preuves.

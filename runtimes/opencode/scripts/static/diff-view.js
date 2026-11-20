@@ -1,4 +1,4 @@
-/* diff-view.js — rendu split view style VS Code pour Edit/Write/Patch.
+/* diff-view.js - rendu split view style VS Code pour Edit/Write/Patch.
  * Module ESM chargé par index.html. Expose window.renderDiffSplit pour les
  * appels depuis le script classique sayrhazi-server.js.
  */

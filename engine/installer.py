@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Installer Sayrhazi — port Python de Install-Sayrhazi.ps1 (multi-plateforme).
+"""Installer Sayrhazi - port Python de Install-Sayrhazi.ps1 (multi-plateforme).
 
 Cree .opencode/agent|resume|history|features|state|backup, recopie agents + watcher
 (Force), cree AGENTS.md / sayrhazi.yaml / opencode.json uniquement si
@@ -30,7 +30,12 @@ def install_project(project: Path, core: Path) -> None:
 
     adapter_agents = core / "runtimes" / "opencode" / "agents"
     for src in sorted(adapter_agents.glob("*.md")):
-        shutil.copy2(src, agent_target / src.name)
+        dst = agent_target / src.name
+        if dst.is_file():
+            # Ne pas écraser les fiches déjà présentes (modèle et réglages
+            # de l'utilisateur) lors d'une réinstallation.
+            continue
+        shutil.copy2(src, dst)
 
     templates = core / "runtimes" / "opencode" / "templates"
     for name, dest in (("AGENTS.md", project / "AGENTS.md"),
@@ -44,7 +49,7 @@ def install_project(project: Path, core: Path) -> None:
     # sayrhazi-modules.py doit exister AVANT le serveur (importé par
     # sayrhazi-serveur.py) ; le dashboard web passe par sayrhazi-serveur.py.
     for name in ("watch-work.py", "services.py", "sayrhazi-modules.py",
-                 "sayrhazi-serveur.py"):
+                 "sayrhazi-serveur.py", "agent_sync.py"):
         src = scripts / name
         if src.is_file():
             shutil.copy2(src, opencode / name)

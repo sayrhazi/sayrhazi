@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bump version Sayrhazi — aligne tous les porteurs de version (stdlib uniquement).
+"""Bump version Sayrhazi - aligne tous les porteurs de version (stdlib uniquement).
 
 Source de vérité d'entrée : la section en tête de CHANGELOG.md (`## X.Y.Z`).
 Cibles : VERSION, pyproject.toml, package.json, package-lock.json,

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI install — delegue a engine/installer.py."""
+"""CLI install - delegue a engine/installer.py."""
 from __future__ import annotations
 
 import subprocess

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * build-hljs-bundle.js — genere static/hljs.bundle.js (UMD) a partir de
+ * build-hljs-bundle.js - genere static/hljs.bundle.js (UMD) a partir de
  * node_modules/highlight.js (paquet npm, licence BSD).
  *
  * Le paquet npm ne fournit pas de bundle navigateur : les fichiers lib/ sont
@@ -65,7 +65,7 @@ for (const name of LANGS) {
 }
 
 const bundle = `/*!
- * hljs.bundle.js — highlight.js ${require(path.join(REPO, "node_modules", "highlight.js", "package.json")).version} (BSD-3-Clause)
+ * hljs.bundle.js - highlight.js ${require(path.join(REPO, "node_modules", "highlight.js", "package.json")).version} (BSD-3-Clause)
  * Bundle navigateur genere par engine/build-hljs-bundle.js (core + ${registered.length} langages).
  * Ne pas editer a la main : regenerer avec node engine/build-hljs-bundle.js.
  */

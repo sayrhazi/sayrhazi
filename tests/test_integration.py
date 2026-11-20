@@ -137,12 +137,12 @@ class TestFullstackFlow(unittest.TestCase):
             "task_id: FEATURE-001\n"
             "scope: fullstack\n"
             "status: EN COURS\n\n"
-            "## Étape frontend — Ali\n"
+            "## Étape frontend - Ali\n"
             "agent: frontend\n"
             f"stage_status: {frontend_status}\n"
             'completed_at: "2026-10-22T10:00:00+04:00"\n'
             "summary: UI faite.\n\n"
-            "## Étape backend — Bamse\n"
+            "## Étape backend - Bamse\n"
             "agent: backend\n"
             f"stage_status: {backend_status}\n"
             'completed_at: "2026-10-22T11:00:00+04:00"\n'

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI Sayrhazi — point d'entree multi-plateforme (stdlib uniquement).
+"""CLI Sayrhazi - point d'entree multi-plateforme (stdlib uniquement).
 
 Usage :
     python cli/main.py [--version] | [install] [--project .]

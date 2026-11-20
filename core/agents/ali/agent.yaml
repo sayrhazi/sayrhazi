@@ -3,8 +3,8 @@ name: Ali
 role: build-front
 description: Interface frontend et maquette UI/UX
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
-model: opencode/inkling-2-small-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/big-pickle)
+model: opencode/big-pickle
 color: "#3B82F6"
 display_key: agents.designer
 permission:

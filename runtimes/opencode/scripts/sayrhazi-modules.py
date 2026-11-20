@@ -1,5 +1,5 @@
 """
-sayrhazi-modules — briques communes Sayrhazi (interne).
+sayrhazi-modules - briques communes Sayrhazi (interne).
 
 Ne pas lancer directement. Ce module agrège les fonctions de lecture
 (sans effet de bord) utilisées par le dashboard web et les tests.
@@ -40,7 +40,7 @@ ROLE_REPORT = {"architect": "plan.txt", "build-front": "frontend.txt",
 
 TASK_RE = re.compile(r"^\s*task_id\s*:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 STATUS_RE = re.compile(r"^\s*status\s*:\s*(\S.*?)\s*$", re.MULTILINE | re.IGNORECASE)
-SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) — (Ali|Bamse)$")
+SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) - (Ali|Bamse)$")
 
 STATE_KEYS = ("task_id", "status", "running_agents")
 
@@ -465,7 +465,7 @@ def build_dashboard_data(project_root: Path) -> dict:
             etat = "attente"
             etat_color = "#6c757d"
         else:
-            etat = "—"
+            etat = "-"
             etat_color = "#888"
 
         calls = 0
@@ -478,10 +478,15 @@ def build_dashboard_data(project_root: Path) -> dict:
         cout_sess = "n/d"
         cout_projet = "n/d"
 
-        if db_path and task_id != "-":
-            prefixe = f"Sayrhazi {task_id} {agent_file} "
-            sessions = find_sessions(db_path, str(project_root), agent_file, prefixe)
+        if db_path:
+            prefixe = f"Sayrhazi {task_id} {agent_file} " if task_id != "-" else ""
+            sessions = find_sessions(db_path, str(project_root), agent_file, prefixe) if prefixe else []
+            if not sessions:
+                # Repli : sessions directes du projet (chat utilisateur) -
+                # elles ne portent pas le préfixe watcher.
+                sessions = find_sessions(db_path, str(project_root), agent_file, "")
             if sessions:
+                usage_pct = "0 %"  # session sans tokens mesurés : 0 % par défaut
                 auto = latest_auto_session(sessions)
                 manuel = latest_manual_session(sessions)
                 calls = sum(1 for s in sessions if s.get("auto"))

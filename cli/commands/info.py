@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI info — noyau + projet installe (stdlib uniquement).
+"""CLI info - noyau + projet installe (stdlib uniquement).
 
 Affiche version noyau, version installee, agents presents, rapports presents.
 Exit 0 (informatif, jamais bloquant).

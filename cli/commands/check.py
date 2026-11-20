@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tunda — petit check optionnel de la configuration Sayrhazi d'un projet.
+"""Tunda - petit check optionnel de la configuration Sayrhazi d'un projet.
 
 Usage :
     python tunda.py sayrhazi [--project .]
@@ -104,7 +104,7 @@ def main() -> int:
         print(f"[WARN] {msg}")
         warns.append(msg)
 
-    print(f"Tunda sayrhazi — projet : {root}")
+    print(f"Tunda sayrhazi - projet : {root}")
 
     # 0. Porte d'entree : Sayrhazi est-il initialise dans ce projet ?
     init_markers = {
@@ -224,7 +224,7 @@ def main() -> int:
     else:
         warn("services.py absent (lance `update sayrhazi` pour l'ajouter)")
 
-    # 6c. briques partagées (lecture OpenCode + handler web) — cœur du dashboard web.
+    # 6c. briques partagées (lecture OpenCode + handler web) - cœur du dashboard web.
     modules = opencode / "sayrhazi-modules.py"
     server = opencode / "sayrhazi-serveur.py"
     if not modules.is_file():

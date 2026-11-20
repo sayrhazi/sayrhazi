@@ -25,15 +25,20 @@
 #     ou être supprimée ; aucune suppression automatique n'est faite.
 #
 # Choix du modèle par agent :
-#   * Les agents livrés par le noyau n'ont plus de `model:` par défaut.
-#   * L'utilisateur choisit le modèle de chaque agent dans le frontmatter
-#     de `.opencode/agent/<agent>.md` (`model: provider/model`), ou via
-#     `sayrhazi.yaml`. Le watcher passe toujours ce modèle en `--model` :
+#   * Les agents livrés par le noyau utilisent par défaut `opencode/big-pickle`
+#     (200 000 tokens de contexte).
+#   * L'utilisateur peut choisir un autre modèle pour chaque agent dans le
+#     frontmatter de `.opencode/agent/<agent>.md` (`model: provider/model`),
+#     ou via `sayrhazi.yaml`. Le watcher passe toujours ce modèle en `--model` :
 #     la fiche du projet est la seule source de vérité.
 #   * `core/runtime/models.yaml` n'écrase jamais le choix de l'utilisateur :
 #     il sert uniquement de référence pour les fenêtres de contexte.
 
 models:
+  opencode/big-pickle:
+    context_tokens: 200000
+    source: releve manuel via opencode
+    verified_at: "2026-11-20"
   opencode/inkling-2-small-free:
     context_tokens: 1048576
     source: releve manuel via opencode

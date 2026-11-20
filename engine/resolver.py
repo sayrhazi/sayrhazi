@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Resolver Sayrhazi — compatibilite noyau / projet installe (stdlib uniquement).
+"""Resolver Sayrhazi - compatibilite noyau / projet installe (stdlib uniquement).
 
 Compare workflow.version du projet a celle du noyau et rend un plan :
 up-to-date | update-available | unknown. Utilise par le CLI (info) et les tests.

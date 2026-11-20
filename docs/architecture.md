@@ -41,8 +41,8 @@ Projet/
 
 ## Interfaces du projet
 
-* **Dashboard web** (servi par `sayrhazi-serveur.py` sur le port **8363**) — état du workflow, rapports d'agents détaillés, conversations avec les agents via l'API native d'OpenCode (création/suppression/renommage automatiques du titre, streaming token par token, indicateurs d'exécution, copie du message utilisateur).
-* **Watcher** (`watch-work.py`) — pilote le parcours déclaratif décrit par `workflow.yaml` (déclenchements automatiques selon les rapports produits).
+* **Dashboard web** (servi par `sayrhazi-serveur.py` sur le port **8363**) - état du workflow, rapports d'agents détaillés, conversations avec les agents via l'API native d'OpenCode (création/suppression/renommage automatiques du titre, streaming token par token, indicateurs d'exécution, copie du message utilisateur).
+* **Watcher** (`watch-work.py`) - pilote le parcours déclaratif décrit par `workflow.yaml` (déclenchements automatiques selon les rapports produits).
 
 Les rapports des agents, l'historique et la configuration restent dans le projet : le noyau ne lit ni n'écrit ailleurs.
 

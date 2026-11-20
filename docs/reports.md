@@ -21,8 +21,8 @@ Les journaux recommandés sont `build-log.md`, `design-log.md`, `review-log.md`,
 `fullstack.txt` est utilisé uniquement par les tâches de scope `fullstack`. Il conserve les rapports d'implémentation d'Ali et de Bamse dans des sections clairement séparées :
 
 * En-tête partagé : `task_id`, `scope` (doit valoir `fullstack`), `status`.
-* Section `## Étape frontend — Ali` : `agent: frontend`, `stage_status`, `completed_at`, `summary`, etc. Seul Ali peut mettre à jour cette section.
-* Section `## Étape backend — Bamse` : `agent: backend`, `stage_status`, `completed_at`, `summary`, etc. Seul Bamse peut mettre à jour cette section.
+* Section `## Étape frontend - Ali` : `agent: frontend`, `stage_status`, `completed_at`, `summary`, etc. Seul Ali peut mettre à jour cette section.
+* Section `## Étape backend - Bamse` : `agent: backend`, `stage_status`, `completed_at`, `summary`, etc. Seul Bamse peut mettre à jour cette section.
 
 La mise à jour est non destructive : modifier une section préserve intégralement l'autre. Validateur : `engine/fullstack.py` (`read_fullstack`, `update_section`, `validate_fullstack`). `tunda`/`checker` signalent les violations sans bloquer.
 
@@ -70,7 +70,7 @@ Les problèmes sont classés `CRITIQUE`, `HAUTE`, `MOYENNE` ou `FAIBLE`. Un rapp
 * Bamse (`backend.txt`) : `EN COURS`, `TERMINÉ` ou `BLOQUÉ`.
 * Ali (`frontend.txt`) : `PROPOSÉ` ou `VALIDÉ`.
 * Hadji (`review.txt`) et Hifadhui (`security.txt`) : `VALIDÉ`, `VALIDÉ AVEC RÉSERVES` ou `CORRECTIONS NÉCESSAIRES`.
-* Zawadi (`qa.txt`) : mêmes verdicts, plus `À COMPLÉTER` lorsque l'observation réelle manque — ce verdict rappelle Bamse automatiquement (`rework_qa`, sauf `backend.txt` plus récent).
+* Zawadi (`qa.txt`) : mêmes verdicts, plus `À COMPLÉTER` lorsque l'observation réelle manque - ce verdict rappelle Bamse automatiquement (`rework_qa`, sauf `backend.txt` plus récent).
 
 ## Contrat minimal d'une tâche
 

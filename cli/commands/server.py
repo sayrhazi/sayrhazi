@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI server — lance le serveur unifie Sayrhazi (dashboard + watcher).
+"""CLI server - lance le serveur unifie Sayrhazi (dashboard + watcher).
 
 Usage :
     python cli/main.py server [--port PORT] [--root CHEMIN]

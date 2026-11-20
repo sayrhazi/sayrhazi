@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Contrats Sayrhazi Lot 1 — parsing tolerant et validation des rapports/taches.
+"""Contrats Sayrhazi Lot 1 - parsing tolerant et validation des rapports/taches.
 
 Reference normative : core/schemas/report.schema.yaml et task.schema.yaml.
 Stdlib uniquement. Utilise par `tunda`/`checker` (section rapports, non bloquante)

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI remove — retrait prudent de l'intégration Sayrhazi (stdlib uniquement).
+"""CLI remove - retrait prudent de l'intégration Sayrhazi (stdlib uniquement).
 
 Supprime UNIQUEMENT les fichiers pilotes par le noyau Sayrhazi :
 

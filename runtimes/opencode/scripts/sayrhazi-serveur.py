@@ -1,5 +1,5 @@
 """
-sayrhazi-serveur.py — serveur unifié Sayrhazi : dashboard web + moteur watcher.
+sayrhazi-serveur.py - serveur unifié Sayrhazi : dashboard web + moteur watcher.
 
 Lance un serveur HTTP sur http://localhost:8363 servant le dashboard de
 sayrhazi-modules.py, et permet de démarrer/arrêter le moteur watch-work.py depuis
@@ -35,7 +35,7 @@ if str(_here) not in sys.path:
     sys.path.insert(0, str(_here))
 
 # Modules existants : pas de copie, pas de duplication de code.
-# watch-work.py : moteur watcher des boutons Marche/Arrêt — INTOUCHÉ.
+# watch-work.py : moteur watcher des boutons Marche/Arrêt - INTOUCHÉ.
 # sayrhazi-modules.py : briques communes (lecture OpenCode + base Handler du
 # dashboard). sayrhazi-modules.py regroupe les briques communes lecture OpenCode + Handler web.
 _mod = importlib.import_module("sayrhazi-modules")
@@ -80,7 +80,11 @@ message_context_tokens = _mod.message_context_tokens
 message_model_key = _mod.message_model_key
 load_model_limits = _mod.load_model_limits
 
-find_project_root = _mod.find_project_root
+try:
+    _agent_sync = importlib.import_module("agent_sync")
+    sync_home_opencode = _agent_sync.sync_home_opencode
+except Exception:
+    sync_home_opencode = None
 
 
 class _LogCapture(io.TextIOBase):
@@ -344,18 +348,119 @@ class OpenCodeServer:
         return self._request("GET", f"/session/{session_id}/message")
 
     def prompt_async(self, session_id: str, message: str, agent: str = "",
-                     directory: str = "") -> tuple[int, Optional[dict]]:
+                     directory: str = "", model: Optional[dict] = None,
+                     attachments: Optional[list] = None,
+                     root: Optional[Path] = None) -> tuple[int, Optional[dict]]:
         """Envoie un message de façon asynchrone (streaming) dans une session OpenCode.
 
         L'agent est transmis pour que la session reste rattachée à l'agent
         choisi dans Sayrhazi (sans lui, OpenCode bascule sur l'agent par
         défaut et la session quitte la barre latérale de l'agent d'origine).
+        Le modèle (choix explicite dans l'UI) est transmis tel quel au prompt
+        OpenCode ({providerID, modelID}), comme dans la TUI ; sinon OpenCode
+        applique le modèle configuré de la session/agent.
+
+        Les pièces jointes `attachments: [{path, startLine, endLine} | {url, filename}]`
+        sont relues côté serveur pour les pièces filesystem (`path`, sources de
+        mention), ou passées telles quelles à OpenCode pour les pièces uploadées
+        du browsers (`url: data:...`, sources clients).
         """
-        payload = {"parts": [{"type": "text", "text": message}]}
+        parts = [{"type": "text", "text": message}]
+        if attachments:
+            for att in attachments:
+                if not isinstance(att, dict):
+                    continue
+                if att.get("url"):
+                    url = str(att.get("url") or "")
+                    name = str(att.get("filename") or att.get("name") or "")
+                    if not name:
+                        name = os.path.basename(url) if url else ""
+                    part = {
+                        "type": "file",
+                        "mime": str(att.get("mime") or "text/plain"),
+                        "url": url,
+                        "filename": name,
+                    }
+                    mention_value = str(att.get("mention") or ("@" + (name or "fichier")))
+                    mention_start = message.find(mention_value)
+                    if mention_start < 0:
+                        mention_start = len(message)
+                    part["source"] = {
+                        "type": "file",
+                        "text": {"value": mention_value, "start": mention_start,
+                                 "end": mention_start + len(mention_value)},
+                        "path": url,
+                    }
+                    parts.append(part)
+                    continue
+                if not att.get("path"):
+                    continue
+
+        payload = {"parts": parts}
         if agent:
             payload["agent"] = agent
+        if isinstance(model, dict):
+            provider_id = str(model.get("providerID") or "").strip()
+            model_id = str(model.get("modelID") or "").strip()
+            if provider_id and model_id:
+                payload["model"] = {"providerID": provider_id, "modelID": model_id}
         return self._request("POST", f"/session/{session_id}/prompt_async"
                              + self._directory_query(directory), payload)
+
+    def revert_session(self, session_id: str, message_id: str,
+                       directory: str = "", part_id: str = "") -> tuple[int, Optional[dict]]:
+        """Revert natif d'une conversation (« Revert - undo messages and file changes »).
+
+        OpenCode stocke `session.revert = {messageID, snapshot, diff}` et
+        restaure les fichiers vers le snapshot ; les messages ne sont pas
+        supprimés (ils disparaissent à l'envoi suivant - cleanup natif).
+        """
+        payload = {"messageID": message_id}
+        if part_id:
+            payload["partID"] = part_id
+        return self._request("POST", f"/session/{session_id}/revert"
+                             + self._directory_query(directory), payload)
+
+    def unrevert_session(self, session_id: str,
+                         directory: str = "") -> tuple[int, Optional[dict]]:
+        """Annule un revert en attente : restaure fichiers + session.revert → null."""
+        return self._request("POST", f"/session/{session_id}/unrevert"
+                             + self._directory_query(directory))
+
+    def abort_session(self, session_id: str,
+                      directory: str = "") -> tuple[int, Optional[dict]]:
+        """Interrompt le traitement en cours sur la session (POST /session/:id/abort).
+
+        L'agent s'arrête (outil ou réponse coupés) ; la session repasse en idle.
+        """
+        return self._request("POST", f"/session/{session_id}/abort"
+                             + self._directory_query(directory))
+
+    def respond_permission(self, request_id: str, reply: str,
+                           message: str = "") -> tuple[int, Optional[dict]]:
+        payload = {"reply": reply}
+        if message:
+            payload["message"] = message
+        return self._request("POST", f"/permission/{request_id}/reply", payload)
+
+    def respond_question(self, request_id: str, answers) -> tuple[int, Optional[dict]]:
+        return self._request("POST", f"/question/{request_id}/reply",
+                             {"answers": answers})
+
+    def reject_question(self, request_id: str) -> tuple[int, Optional[dict]]:
+        return self._request("POST", f"/question/{request_id}/reject", {})
+
+    def list_permissions(self, directory: str = "") -> tuple[int, Optional[dict]]:
+        return self._request("GET", f"/permission" + self._directory_query(directory))
+
+    def list_questions(self, directory: str = "") -> tuple[int, Optional[dict]]:
+        return self._request("GET", f"/question" + self._directory_query(directory))
+
+    def rename_session(self, session_id: str, title: str,
+                       directory: str = "") -> tuple[int, Optional[dict]]:
+        """Renomme une session via PATCH /session/{id} (titre natif)."""
+        return self._request("PATCH", f"/session/{session_id}"
+                             + self._directory_query(directory), {"title": title})
 
     def global_event(self) -> tuple[int, Optional[dict]]:
         """Récupère les événements SSE globaux d'OpenCode Server."""
@@ -691,8 +796,8 @@ def get_chat_history(root: Path, agent_file: str) -> list:
     except Exception:
         return messages
 
+    # La plus récente en haut (ordre chronologique inverse, comme la sidebar des discussions).
     sessions = list(rows)[:10]
-    sessions.reverse()
 
     for sid, title, cost, time_created, time_updated in sessions:
         try:
@@ -877,6 +982,115 @@ def _resolve_model_name(provider_id: str, model_id: str) -> str:
         except Exception:
             pass
     return model_id
+
+
+# Catalogue providers OpenCode (appelé par la GUI et pour résoudre le nom
+# affichable du fournisseur d'un modèle). Cache court : le catalogue change
+# rarement mais Sayrhazi ne veut pas servir un catalogue figé.
+_PROVIDER_CATALOG_CACHE: Optional[list] = None
+_PROVIDER_CATALOG_AT = 0.0
+_PROVIDER_CATALOG_TTL = 60.0
+
+
+# Tri canonique des variantes (minimum -> maximum) ; variantes hors liste à la fin, alphabetiquement.
+_REASONING_SCALE = ["minimal", "low", "medium", "high", "max", "xhigh", "none"]
+
+def _variant_sort_key(v: str):
+    v = str(v).lower()
+    return (0, _REASONING_SCALE.index(v), "") if v in _REASONING_SCALE else (1, 0, v)
+
+
+def _provider_catalog() -> list:
+    """Catalogue OpenCode : providers connectés avec leurs modèles.
+
+    Sayrhazi n'invente rien : il relaie GET /config/providers et ne fait que
+    filtrer l'affichage - statut « deprecated » exclu, modèles « free »
+    (provider opencode, coût d'entrée nul) signalés, sections avec opencode
+    d'abord (comme la TUI), modèles free d'abord puis date de sortie
+    décroissante. Le cache dure 60 s pour ne pas charger la conversation.
+    """
+    global _PROVIDER_CATALOG_CACHE, _PROVIDER_CATALOG_AT
+    import time
+    now = time.time()
+    if _PROVIDER_CATALOG_CACHE is not None and now - _PROVIDER_CATALOG_AT < _PROVIDER_CATALOG_TTL:
+        return _PROVIDER_CATALOG_CACHE
+    out = []
+    try:
+        req = urllib.request.Request("http://127.0.0.1:4096/config/providers", method="GET")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception:
+        _PROVIDER_CATALOG_CACHE = []
+        _PROVIDER_CATALOG_AT = now
+        return []
+    providers = [p for p in (data.get("providers") or []) if isinstance(p, dict)]
+    providers.sort(key=lambda p: (0 if p.get("id") == "opencode" else 1, str(p.get("name") or p.get("id") or "").lower()))
+    for p in providers:
+        pid = str(p.get("id") or "")
+        if not pid:
+            continue
+        name = str(p.get("name") or pid)
+        models_out = []
+        for mid, m in (p.get("models") or {}).items():
+            if not isinstance(m, dict):
+                continue
+            if str(m.get("status") or "active") == "deprecated":
+                continue
+            cost = m.get("cost") or {}
+            try:
+                input_cost = float(cost.get("input") or 0)
+            except (TypeError, ValueError):
+                input_cost = 0.0
+            free = pid == "opencode" and input_cost == 0.0
+            try:
+                release = int(str(m.get("release_date") or "0").replace("-", "") or 0)
+            except (TypeError, ValueError):
+                release = 0
+            try:
+                context = int((m.get("limit") or {}).get("context") or 0)
+            except (TypeError, ValueError):
+                context = 0
+            raw_variants = m.get("variants") if isinstance(m.get("variants"), dict) else {}
+            variants = sorted(raw_variants.keys(), key=_variant_sort_key)
+            models_out.append({
+                "id": str(mid),
+                "name": str(m.get("name") or mid),
+                "free": bool(free),
+                "releaseDate": release,
+                "context": context,
+                "variants": [str(v) for v in variants],
+                # Relais capabilities OpenCode pour la tooltip CSS par item.
+                # Ne jamais inventer de valeurs : on transfère telles quelles.
+                "capabilities": m.get("capabilities") if isinstance(m.get("capabilities"), dict) else None,
+                "modalities": m.get("modalities") if isinstance(m.get("modalities"), dict) else None,
+            })
+        # Comme la TUI : free d'abord, puis date de sortie décroissante, puis nom.
+        models_out.sort(key=lambda m: (not m["free"], -m["releaseDate"], m["name"].lower()))
+        if models_out:
+            out.append({"id": pid, "name": name, "models": models_out})
+    _PROVIDER_CATALOG_CACHE = out
+    _PROVIDER_CATALOG_AT = now
+    return out
+
+
+def _provider_name(provider_id: str) -> str:
+    pid = str(provider_id or "")
+    if not pid:
+        return ""
+    for p in _provider_catalog():
+        if p["id"] == pid:
+            return p["name"]
+    return pid
+
+
+def _model_by_id(provider_id: str, model_id: str) -> Optional[dict]:
+    for p in _provider_catalog():
+        if p["id"] != provider_id:
+            continue
+        for m in p["models"]:
+            if m["id"] == model_id:
+                return m
+    return None
 
 
 def _format_ms(ms) -> str:
@@ -1068,6 +1282,25 @@ def _part_to_item(payload, ctx, part_id=""):
 
     if ptype in ("step-start", "step-finish"):
         return None
+
+    if ptype == "retry":
+        # RetryPart : le TUI l'affiche en "retrying in Xs" sans clôturer la boucle.
+        r_err = payload.get("error") if isinstance(payload.get("error"), dict) else {}
+        r_data = r_err.get("data") if isinstance(r_err.get("data"), dict) else {}
+        r_time = payload.get("time") if isinstance(payload.get("time"), dict) else {}
+        item = {
+            "kind": "retry",
+            "attempt": int(payload.get("attempt") or 0),
+            "time_created": r_time.get("created"),
+            "error_name": str(r_err.get("name") or "UnknownError"),
+            "error_status": r_data.get("statusCode"),
+            "error_message": str(r_data.get("message") or ""),
+            "error_is_retryable": bool(r_data.get("isRetryable", False)),
+            "error_response_body": str(r_data.get("responseBody") or ""),
+        }
+        item["part_id"] = part_id
+        ctx["items"].append(item)
+        return item
 
     if ptype == "text" and ptext:
         if ctx["pending_reasoning"] is not None:
@@ -1348,25 +1581,50 @@ def _translate_opencode_event(event, session_id):
     if event_type == "session.idle":
         # Fin du tour : le message agent est complet
         return {"kind": "idle", "sessionID": session_id}
+    if event_type == "session.status":
+        status = props.get("status") or {}
+        stype = str(status.get("type") or "")
+        if stype == "busy":
+            return {"kind": "busy", "sessionID": session_id}
+        if stype == "idle":
+            return {"kind": "idle", "sessionID": session_id}
+        if stype == "retry":
+            # OpenCode retry inner-service: jamais d'erreur, juste ce broadcast.
+            return {"kind": "retry", "sessionID": session_id,
+                    "attempt": int(status.get("attempt") or 0),
+                    "message": str(status.get("message") or ""),
+                    "next": int(status.get("next") or 0)}
     if event_type == "session.error":
         err = props.get("error") or {}
-        return {"kind": "error", "messageID": str(props.get("sessionID") or ""),
-                "message": str(err.get("message") or err.get("name") or "")}
+        data = err.get("data") if isinstance(err.get("data"), dict) else {}
+        return {"kind": "error", "sessionID": session_id,
+                "name": str(err.get("name") or "UnknownError"),
+                "statusCode": data.get("statusCode"),
+                "message": str(data.get("message") or err.get("message") or err.get("name") or ""),
+                "isRetryable": bool(data.get("isRetryable", False)),
+                "responseBody": str(data.get("responseBody") or "")}
     if event_type == "message.updated":
         info = props.get("info") or {}
         completed = (info.get("time") or {}).get("completed")
-        return {"kind": "message", "messageID": str(info.get("id") or ""),
-                "role": str(info.get("role") or ""),
-                "completed": completed if isinstance(completed, int) else None,
-                "agent": str(info.get("agent") or info.get("mode") or "")}
+        out = {"kind": "message", "messageID": str(info.get("id") or ""),
+               "role": str(info.get("role") or ""),
+               "completed": completed if isinstance(completed, int) else None,
+               "agent": str(info.get("agent") or info.get("mode") or "")}
+        err_info = info.get("error") if isinstance(info.get("error"), dict) else None
+        if err_info:
+            err_data = err_info.get("data") if isinstance(err_info.get("data"), dict) else {}
+            out["error"] = {"name": str(err_info.get("name") or "UnknownError"),
+                             "statusCode": err_data.get("statusCode"),
+                             "message": str(err_data.get("message") or ""),
+                             "isRetryable": bool(err_data.get("isRetryable", False)),
+                             "responseBody": str(err_data.get("responseBody") or "")}
+        return out
     if event_type == "message.part.delta":
-        # delta incrémental (token). Le frontend concatène sur l'item portant
-        # le même partID. Le coeur du texte (reasoning ou réponse finale)
-        # arrive aussi en `field: "text"` ; le frontend le classe d'après
-        # l'item correspondant déjà construit.
+        # delta incrémental — tout champ compte (text, reasoning, etc.) :
+        # c'est le premier signe que l'agent a réellement commencé à agir.
         field = str(props.get("field") or "")
         delta = str(props.get("delta") or "")
-        if not delta or field != "text":
+        if not delta:
             return None
         return {
             "kind": "text_delta",
@@ -1495,9 +1753,22 @@ class ServerHandler(_mod.Handler):
                 session_id = parts[4]
                 self._handle_chat_session_info(session_id)
                 return
+            if len(parts) >= 6 and parts[5] == "pending":
+                session_id = parts[4]
+                self._handle_chat_pending(session_id)
+                return
             else:
                 self._handle_chat_session_get()
                 return
+        if self.path.startswith("/api/chat/find-file"):
+            self._handle_chat_find_file()
+            return
+        if self.path == "/api/chat/providers":
+            self._send_json({"ok": True, "providers": _provider_catalog()})
+            return
+        if self.path.startswith("/api/chat/current-model"):
+            self._handle_chat_current_model()
+            return
         if self.path == "/api/chat/event":
             self._handle_chat_event()
             return
@@ -1559,6 +1830,22 @@ class ServerHandler(_mod.Handler):
             self._handle_chat_session_post()
         elif self.path.startswith("/api/chat/session/") and self.path.endswith("/prompt_async"):
             self._handle_chat_session_prompt_async()
+        elif self.path.startswith("/api/chat/session/") and self.path.endswith("/revert/preview"):
+            self._handle_chat_session_revert_preview()
+        elif self.path.startswith("/api/chat/session/") and self.path.endswith("/revert"):
+            self._handle_chat_session_revert()
+        elif self.path.startswith("/api/chat/session/") and self.path.endswith("/unrevert"):
+            self._handle_chat_session_unrevert()
+        elif self.path.startswith("/api/chat/session/") and self.path.endswith("/abort"):
+            self._handle_chat_session_abort()
+        elif self.path.startswith("/api/chat/session/") and "/permission/" in self.path and self.path.endswith("/reply"):
+            self._handle_chat_permission_reply()
+        elif self.path.startswith("/api/chat/session/") and "/question/" in self.path and self.path.endswith("/reply"):
+            self._handle_chat_question_reply()
+        elif self.path.startswith("/api/chat/session/") and "/question/" in self.path and self.path.endswith("/reject"):
+            self._handle_chat_question_reject()
+        elif self.path.startswith("/api/chat/session/") and self.path.endswith("/title"):
+            self._handle_chat_session_title()
         else:
             self.send_response(404)
             self.end_headers()
@@ -1739,7 +2026,7 @@ class ServerHandler(_mod.Handler):
         self._send_json(result)
 
     def _handle_chat_session_get(self) -> None:
-        """GET /api/chat/session/:agent — créer une session OpenCode (route historique).
+        """GET /api/chat/session/:agent - créer une session OpenCode (route historique).
 
         La création se fait désormais par POST /api/chat/session ; cette route
         est conservée pour les appelants existants et délègue à la même
@@ -1760,7 +2047,7 @@ class ServerHandler(_mod.Handler):
         self._send_json({"ok": sc in (200, 201), "session": result, "error": result.get("error") if sc not in (200, 201) else None}, status=sc if sc in (200, 201, 400, 500) else 500)
 
     def _handle_chat_session_create(self) -> None:
-        """POST /api/chat/session — creation native d'une session OpenCode.
+        """POST /api/chat/session - creation native d'une session OpenCode.
 
         Corps : {"agent": "ali"}. La session est creee par OpenCode dans le
         repertoire du projet, SANS titre : OpenCode renomme la session
@@ -1800,7 +2087,7 @@ class ServerHandler(_mod.Handler):
         })
 
     def _handle_chat_session_delete(self, session_id: str) -> None:
-        """DELETE /api/chat/session/:id — suppression native d'une session.
+        """DELETE /api/chat/session/:id - suppression native d'une session.
 
         La suppression passe par l'endpoint natif d'OpenCode (qui supprime
         aussi les sessions enfants). Sayrhazi ne touche jamais aux donnees
@@ -1821,7 +2108,7 @@ class ServerHandler(_mod.Handler):
         self._send_json({"ok": True, "session_id": session_id, "deleted": result})
 
     def _handle_chat_session_info(self, session_id: str) -> None:
-        """GET /api/chat/session/:id/info — état natif d'une session.
+        """GET /api/chat/session/:id/info - état natif d'une session.
 
         Sert notamment à relire le titre après le renommage automatique
         d'OpenCode.
@@ -1844,11 +2131,451 @@ class ServerHandler(_mod.Handler):
             "parent_id": str(result.get("parentID") or ""),
             "directory": str(result.get("directory") or ""),
             "default_title": _is_default_session_title(str(result.get("title") or "")),
+            "revert": result.get("revert") or None,
+            "summary": result.get("summary") or None,
+        })
+
+    def _session_id_from_path(self) -> str:
+        parts = self.path.split("/")
+        return str(parts[4]) if len(parts) >= 6 else ""
+
+    def _handle_chat_session_revert(self) -> None:
+        """POST /api/chat/session/:id/revert - revert natif d'OpenCode.
+
+        Corps : {"messageID": "msg_…", "partID": "prt_…" (optionnel)}.
+        Pass-through : Sayrhazi ne touche jamais à SQLite ni aux snapshots ;
+        c'est OpenCode qui stocke session.revert et restaure les fichiers.
+        La suppression effective des messages reverted aura lieu à l'envoi
+        suivant (cleanup natif dans prompt_async).
+        """
+        session_id = self._session_id_from_path()
+        if not session_id:
+            self._send_json({"ok": False, "message": "session_id manquant"}, status=400)
+            return
+        body = self._read_body()
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
+            return
+        message_id = str(data.get("messageID") or data.get("message_id") or "").strip()
+        if not message_id:
+            self._send_json({"ok": False, "message": "messageID requis"}, status=400)
+            return
+        part_id = str(data.get("partID") or "").strip()
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.revert_session(session_id, message_id, str(root), part_id)
+        if sc != 200:
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "revert refusé par OpenCode",
+                             "error": result.get("error") or result.get("raw") or result.get("message")},
+                            status=sc if sc in (400, 404, 409) else 500)
+            return
+        self._send_json({
+            "ok": True,
+            "session_id": str(result.get("id") or session_id),
+            "revert": result.get("revert") or None,
+            "summary": result.get("summary") or None,
+            "session": result,
+        })
+
+    def _handle_chat_session_revert_preview(self) -> None:
+        """POST /api/chat/session/:id/revert/preview - aperçu sans effet.
+
+        Sayrhazi n'envoie jamais le revert côté OpenCode avant l'envoi réel
+        (les fichiers seraient sinon restaurés au clic « Restaurer ce
+        message »). Pour afficher le bloc « fichiers concernés » sans effet
+        de bord, Sayrhazi interroge ici un revert immédiat suivi d'un
+        unrevert immédiat : OpenCode restaure les fichiers dans l'état
+        pré-revert, calcule le diff, puis restaure l'état d'origine. Aucun
+        marqueur n'est laissé (session.revert reste null) ; Sayrhazi ne le
+        fusionne à la vraie question qu'au moment de l'envoi.
+        """
+        session_id = self._session_id_from_path()
+        if not session_id:
+            self._send_json({"ok": False, "message": "session_id manquant"}, status=400)
+            return
+        body = self._read_body()
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
+            return
+        message_id = str(data.get("messageID") or data.get("message_id") or "").strip()
+        if not message_id:
+            self._send_json({"ok": False, "message": "messageID requis"}, status=400)
+            return
+        part_id = str(data.get("partID") or "").strip()
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc1, r1 = opencode_server.revert_session(session_id, message_id, str(root), part_id)
+        if sc1 != 200:
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "revert refusé par OpenCode",
+                             "error": r1.get("error") or r1.get("raw") or r1.get("message")},
+                            status=sc1 if sc1 in (400, 404, 409) else 500)
+            return
+        diff = (r1.get("revert") or {}).get("diff") if isinstance(r1, dict) else ""
+        summary = r1.get("summary") if isinstance(r1, dict) else None
+        sc2, r2 = opencode_server.unrevert_session(session_id, str(root))
+        if sc2 != 200:
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "aperçu revert : impossible de restaurer l'état d'origine",
+                             "error": r2.get("error") or r2.get("raw") or r2.get("message")},
+                            status=500)
+            return
+        self._send_json({
+            "ok": True,
+            "session_id": str(r1.get("id") or session_id),
+            "diff": diff or "",
+            "summary": summary or None,
         })
 
 
+    def _handle_chat_session_unrevert(self) -> None:
+        """POST /api/chat/session/:id/unrevert - annule un revert en attente.
+
+        Restaure l'état d'avant le revert (fichiers + session.revert à null).
+        Les messages reverted n'ont jamais été supprimés : ils réapparaissent.
+        """
+        session_id = self._session_id_from_path()
+        if not session_id:
+            self._send_json({"ok": False, "message": "session_id manquant"}, status=400)
+            return
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.unrevert_session(session_id, str(root))
+        if sc != 200:
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "unrevert refusé par OpenCode",
+                             "error": result.get("error") or result.get("raw") or result.get("message")},
+                            status=sc if sc in (400, 404, 409) else 500)
+            return
+        self._send_json({
+            "ok": True,
+            "session_id": str(result.get("id") or session_id),
+            "revert": result.get("revert") or None,
+            "summary": result.get("summary") or None,
+            "session": result,
+        })
+
+    def _handle_chat_session_abort(self) -> None:
+        """POST /api/chat/session/:id/abort - interrompt l'agent en cours.
+
+        Pass-through vers POST /session/{id}/abort d'OpenCode ; l'agent s'achève
+        immédiatement (outil ou réponse coupés).
+        """
+        session_id = self._session_id_from_path()
+        if not session_id:
+            self._send_json({"ok": False, "message": "session_id manquant"}, status=400)
+            return
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.abort_session(session_id, str(root))
+        if sc not in (200, 201, 202, 204):
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "Interruption refusée par OpenCode",
+                             "error": result.get("error") or result.get("raw") or result.get("message")},
+                            status=sc if sc in (400, 404, 409) else 500)
+            return
+        self._send_json({"ok": True, "session_id": session_id, "aborted": True})
+
+    def _handle_chat_session_title(self) -> None:
+        """POST /api/chat/session/:id/title - renomme la discussion.
+
+        Simple pass-through vers PATCH /session/{id} d'OpenCode (titre natif) ;
+        Sayrhazi ne touche pas SQLite.
+        """
+        session_id = self._session_id_from_path()
+        if not session_id:
+            self._send_json({"ok": False, "message": "session_id manquant"}, status=400)
+            return
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        body = self._read_body()
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
+            return
+        title = str(data.get("title") or "").strip()
+        if not title:
+            self._send_json({"ok": False, "message": "Le nom ne peut pas être vide."}, status=400)
+            return
+        if len(title) > 200:
+            self._send_json({"ok": False, "message": "Le nom dépasse 200 caractères."}, status=400)
+            return
+        sc, result = opencode_server.rename_session(session_id, title, str(root))
+        if sc != 200:
+            self._send_json({"ok": False, "session_id": session_id,
+                             "message": "Renommage refusé par OpenCode",
+                             "error": (result or {}).get("error") or (result or {}).get("raw") or (result or {}).get("message")},
+                            status=sc if sc in (400, 404, 409) else 500)
+            return
+        self._send_json({
+            "ok": True,
+            "session_id": session_id,
+            "title": str((result or {}).get("title") or title),
+        })
+
+    def _handle_chat_current_model(self) -> None:
+        """GET /api/chat/current-model?agent=<file> - modèle de l'agent.
+
+        Le modèle vient du frontmatter de l'agent Sayrhazi (comme la TUI lit
+        la config de l'agent) ; le nom lisible et l'indicateur free sont
+        résolus depuis le catalogue OpenCode.
+        """
+        agent_file = ""
+        if "?" in self.path:
+            import urllib.parse
+            query = self.path.split("?", 1)[1]
+            for param in query.split("&"):
+                if param.startswith("agent="):
+                    agent_file = urllib.parse.unquote(param.split("=", 1)[1])
+                    break
+        agent_file = agent_file.strip()
+        if not agent_file or not re.match(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,31}$", agent_file):
+            self._send_json({"ok": False, "message": "agent invalide ou manquant"}, status=400)
+            return
+        root = ServerHandler.project_root
+        full, _short = agent_model(root, agent_file)
+        full = str(full or "").strip()
+        if not full or "/" not in full:
+            self._send_json({"ok": False, "message": "modèle introuvable dans le frontmatter de l'agent"}, status=400)
+            return
+        provider_id, model_id = full.split("/", 1)
+        provider_id = provider_id.strip()
+        model_id = model_id.strip()
+        if not provider_id or not model_id:
+            self._send_json({"ok": False, "message": "modèle incomplet dans le frontmatter de l'agent"}, status=400)
+            return
+        m = _model_by_id(provider_id, model_id)
+        provider_name = _provider_name(provider_id)
+        self._send_json({
+            "ok": True,
+            "model": {
+                "providerID": provider_id,
+                "modelID": model_id,
+                "name": str(m["name"] if m else model_id),
+                "providerName": provider_name,
+                "free": bool(m["free"]) if m else False,
+            },
+        })
+
+    def _handle_chat_find_file(self) -> None:
+        """GET /api/chat/find-file?query=<q>&type=file|directory&limit=<n> - autocomplétion @.
+
+        Recherche floue confinée au répertoire racine du projet (comme la TUI).
+        Retourne des chemins relatifs à la racine, jamais le préfixe racine.
+        """
+        import urllib.parse
+        query = ""
+        file_type = "any"
+        limit = 20
+        dirs_only = False
+        query_str = self.path.split("?", 1)[1] if "?" in self.path else ""
+        for param in query_str.split("&"):
+                if param.startswith("query="):
+                    query = urllib.parse.unquote(param.split("=", 1)[1])
+                elif param.startswith("type="):
+                    file_type = urllib.parse.unquote(param.split("=", 1)[1]).strip().lower() or "any"
+                elif param.startswith("limit="):
+                    try:
+                        limit = int(param.split("=", 1)[1])
+                    except ValueError:
+                        limit = 20
+                elif param.startswith("dirs="):
+                    dirs_only = urllib.parse.unquote(param.split("=", 1)[1]).strip().lower() == "true"
+        root = ServerHandler.project_root
+        if not query:
+            self._send_json({"ok": True, "matches": []})
+            return
+        skip_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", ".cache",
+                     "dist", "build", ".next", ".idea", ".vscode", ".mypy_cache",
+                     ".gradle", "target", "bin", "obj", "coverage", ".pytest_cache",
+                     ".tox", ".eggs", "site-packages"}
+        q_norm = query.strip().lower()
+        q_parts = [
+            q_norm[i] for i in range(len(q_norm))
+            if q_norm[i].isalpha() or q_norm[i].isdigit() or q_norm[i] in "._-/"
+        ]
+        q_needle = "".join(q_parts)
+        matches = []
+        try:
+            for dirpath, dirnames, filenames in os.walk(root):
+                dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
+                if file_type in ("directory", "any", "") or dirs_only:
+                    for d in dirnames:
+                        rel = os.path.relpath(os.path.join(dirpath, d), root)
+                        matches.append((rel.replace("\\", "/"), 1))
+                if file_type in ("file", "any", ""):
+                    for f in filenames:
+                        if f.startswith("."):
+                            continue
+                        full = os.path.join(dirpath, f)
+                        rel = os.path.relpath(full, root).replace("\\", "/")
+                        matches.append((rel, 0))
+            if not matches:
+                self._send_json({"ok": True, "matches": []})
+                return
+            scored = []
+            if not q_needle:
+                for rel, is_dir in matches:
+                    scored.append((-1, rel, is_dir))
+            else:
+                for rel, is_dir in matches:
+                    lower = rel.lower()
+                    if q_needle in lower:
+                        scored.append((0, rel, is_dir))
+                    elif q_needle[: max(1, int(len(q_needle) * 0.75))] in lower:
+                        scored.append((1, rel, is_dir))
+                    else:
+                        # match flou strict : toutes les lettres du needle dans l'ordre
+                        i = 0
+                        ok = True
+                        for ch in lower:
+                            if i < len(q_needle) and ch == q_needle[i]:
+                                i += 1
+                        if i == len(q_needle):
+                            scored.append((2, rel, is_dir))
+            if not scored:
+                self._send_json({"ok": True, "matches": []})
+                return
+            scored.sort(key=lambda item: (item[0], len(item[1]), item[1].lower()))
+            seen = set()
+            result = []
+            for _, rel, is_dir in scored:
+                if rel in seen:
+                    continue
+                seen.add(rel)
+                result.append({"path": rel, "directory": bool(is_dir)})
+                if len(result) >= limit:
+                    break
+            self._send_json({"ok": True, "matches": result})
+        except Exception as exc:
+            self._send_json({"ok": False, "message": str(exc)}, status=500)
+
+    def _handle_chat_pending(self, session_id: str) -> None:
+        """GET /api/chat/session/:id/pending - permissions et questions en attente."""
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        _sc_perm, raw_permissions = opencode_server.list_permissions(str(root))
+        _sc_quest, raw_questions = opencode_server.list_questions(str(root))
+        permissions = []
+        if isinstance(raw_permissions, list):
+            for p in raw_permissions:
+                if isinstance(p, dict) and p.get("sessionID") == session_id:
+                    permissions.append(p)
+        questions = []
+        if isinstance(raw_questions, list):
+            for q in raw_questions:
+                if isinstance(q, dict) and q.get("sessionID") == session_id:
+                    questions.append(q)
+        self._send_json({"ok": True, "session_id": session_id,
+                         "permission": permissions, "question": questions})
+
+    def _chat_request_ids(self):
+        parts = self.path.split("/")
+        if len(parts) < 7:
+            return None, None, None
+        sid = parts[4] if parts[3] == "session" and len(parts) >= 5 else ""
+        if not sid:
+            return None, None, None
+        return sid, parts[5], parts[6]
+
+    def _handle_chat_permission_reply(self) -> None:
+        """POST /api/chat/session/:id/permission/:requestID/reply - autorise/refuse un outil."""
+        sid, kind, rid = self._chat_request_ids()
+        if not sid or kind != "permission" or not rid:
+            self._send_json({"ok": False, "message": "route invalide"}, status=400)
+            return
+        body = self._read_body()
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
+            return
+        reply = str(data.get("reply") or "").strip()
+        if reply not in ("once", "always", "reject"):
+            self._send_json({"ok": False, "message": "reply doit être once|always|reject"}, status=400)
+            return
+        message = str(data.get("message") or "").strip()
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.respond_permission(rid, reply, message)
+        ok = sc in (200, 201, 204)
+        self._send_json({"ok": ok, "session_id": sid, "reply": reply,
+                         "error": result.get("error") or result.get("message") if not ok and isinstance(result, dict) else None},
+                        status=sc if sc else 500)
+
+    def _handle_chat_question_reply(self) -> None:
+        """POST /api/chat/session/:id/question/:requestID/reply - répond aux questions de l'agent."""
+        sid, kind, rid = self._chat_request_ids()
+        if not sid or kind != "question" or not rid:
+            self._send_json({"ok": False, "message": "route invalide"}, status=400)
+            return
+        body = self._read_body()
+        try:
+            data = json.loads(body.decode("utf-8")) if body else {}
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
+            return
+        answers = data.get("answers")
+        if not isinstance(answers, list):
+            self._send_json({"ok": False, "message": "answers doit être un tableau"}, status=400)
+            return
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.respond_question(rid, answers)
+        ok = sc in (200, 201, 204)
+        self._send_json({"ok": ok, "session_id": sid,
+                         "error": result.get("error") or result.get("message") if not ok and isinstance(result, dict) else None},
+                        status=sc if sc else 500)
+
+    def _handle_chat_question_reject(self) -> None:
+        """POST /api/chat/session/:id/question/:requestID/reject - rejette les questions de l'agent."""
+        sid, kind, rid = self._chat_request_ids()
+        if not sid or kind != "question" or not rid:
+            self._send_json({"ok": False, "message": "route invalide"}, status=400)
+            return
+        root = ServerHandler.project_root
+        global opencode_server
+        if opencode_server is None:
+            self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
+            return
+        sc, result = opencode_server.reject_question(rid)
+        ok = sc in (200, 201, 204)
+        self._send_json({"ok": ok, "session_id": sid,
+                         "error": result.get("error") or result.get("message") if not ok and isinstance(result, dict) else None},
+                        status=sc if sc else 500)
+
     def _handle_chat_session_messages(self, session_id: str) -> None:
-        """GET /api/chat/session/:id/messages — tous les messages d'une session.
+        """GET /api/chat/session/:id/messages - tous les messages d'une session.
 
         Le contenu textuel est stocke dans la table `part` (type text/reasoning),
         pas dans `message.data` qui ne porte que les metriques.
@@ -1908,6 +2635,18 @@ class ServerHandler(_mod.Handler):
             time_raw = meta.get("time_created", mtime)
             seq += 1
             msg_payload = _parse_tool_data(data_json) if data_json else {}
+            assistant_error = None
+            if isinstance(msg_payload, dict):
+                err = msg_payload.get("error")
+                if isinstance(err, dict):
+                    err_data = err.get("data") if isinstance(err.get("data"), dict) else {}
+                    assistant_error = {
+                        "name": str(err.get("name") or "UnknownError"),
+                        "statusCode": err_data.get("statusCode"),
+                        "message": str(err_data.get("message") or ""),
+                        "isRetryable": bool(err_data.get("isRetryable", False)),
+                        "responseBody": str(err_data.get("responseBody") or ""),
+                    }
 
             ctx = {
                 "pending_reasoning": None,
@@ -1919,6 +2658,23 @@ class ServerHandler(_mod.Handler):
                 payload = _parse_tool_data(pdata_json) if pdata_json else {}
                 _part_to_item(payload, ctx, part_id)
             items = ctx["items"]
+            # Les RetryParts ne sont pas rendues inline : le bandeau
+            # transitoire et le bandeau rouge définitif portent l'information
+            # de retry/erreur. On les dépose de la liste persistée.
+            items = [it for it in items if it.get("kind") != "retry"]
+
+            # Message `user` portant un part compaction (le tour auto/overflow
+            # déclenché par OpenCode) et l'assistant `compaction` qui le suit
+            # sont des artefacts internes : on ne les remontera pas à l'interface.
+            is_user_compaction = role == "user" and any(
+                rp.get("type") == "compaction" for rp in ctx["raw_parts"]
+            )
+            is_assistant_compaction = role == "agent" and isinstance(msg_payload, dict) and (
+                str(msg_payload.get("agent") or "").lower() == "compaction"
+                or str(msg_payload.get("mode") or "").lower() == "compaction"
+            )
+            if is_user_compaction or is_assistant_compaction:
+                continue
             tools_list = ctx["tools_list"]
             text_parts = ctx["text_parts"]
             part_starts = ctx["part_starts"]
@@ -1974,6 +2730,7 @@ class ServerHandler(_mod.Handler):
                 "tools": tools_list,
                 "items": items,
                 "model": model_key,
+                "model_provider": _provider_name(provider_id) if provider_id else "",
                 "parent_id": str(msg_payload.get("parentID") or ""),
                 "raw_role": str(msg_payload.get("role") or ""),
                 "raw_parts": raw_parts,
@@ -1992,6 +2749,9 @@ class ServerHandler(_mod.Handler):
                 "_start": msg_start,
                 "_end": msg_end,
                 "seq": seq,
+                # Erreur définitive du tour (assistant) : l'interface en déduit
+                # le bandeau rouge « Upstream request failed » au rechargement.
+                "error": assistant_error,
             })
 
         # Selection du footer agent : reproduction exacte de ko()/To()/Mo() d'OpenCode.
@@ -2027,7 +2787,7 @@ class ServerHandler(_mod.Handler):
         self._send_json({"ok": True, "session": session_id, "messages": messages})
 
     def _handle_chat_session_post(self) -> None:
-        """POST /api/chat/session/:id/message — envoyer un message dans une session.
+        """POST /api/chat/session/:id/message - envoyer un message dans une session.
 
         L'API native d'OpenCode attend des `parts` (le champ `message` a été
         retiré en 1.19.0) ; l'agent est transmis pour que la session reste
@@ -2045,10 +2805,8 @@ class ServerHandler(_mod.Handler):
             self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
             return
         message = data.get("message", "")
-        if not message:
-            self._send_json({"ok": False, "message": "message requis"}, status=400)
-            return
         agent = str(data.get("agent") or "")
+        attachments = data.get("attachments") if isinstance(data.get("attachments"), list) else None
         root = ServerHandler.project_root
         global opencode_server
         if opencode_server is None:
@@ -2061,7 +2819,7 @@ class ServerHandler(_mod.Handler):
                          "error": result.get("error") if isinstance(result, dict) and not ok else None})
 
     def _handle_chat_event(self) -> None:
-        """GET /api/chat/event — événements SSE d'OpenCode Server."""
+        """GET /api/chat/event - événements SSE d'OpenCode Server."""
         global opencode_server
         if opencode_server is None:
             self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
@@ -2070,7 +2828,7 @@ class ServerHandler(_mod.Handler):
         self._send_json({"ok": sc == 200, "events": result}, status=sc if sc in (200, 201, 400, 500) else 500)
 
     def _handle_chat_session_prompt_async(self) -> None:
-        """POST /api/chat/session/:id/prompt_async — envoyer un message de façon asynchrone (streaming)."""
+        """POST /api/chat/session/:id/prompt_async - envoyer un message de façon asynchrone (streaming)."""
         parts = self.path.split("/")
         if len(parts) < 5:
             self._send_json({"ok": False, "message": "session manquant"}, status=400)
@@ -2083,16 +2841,23 @@ class ServerHandler(_mod.Handler):
             self._send_json({"ok": False, "message": "JSON invalide"}, status=400)
             return
         message = data.get("message", "")
-        if not message:
+        attachments = data.get("attachments") if isinstance(data.get("attachments"), list) else None
+        if not message and not attachments:
             self._send_json({"ok": False, "message": "message requis"}, status=400)
             return
         agent = str(data.get("agent") or "")
+        model = data.get("model") if isinstance(data.get("model"), dict) else None
         root = ServerHandler.project_root
         global opencode_server
         if opencode_server is None:
             self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
             return
-        sc, result = opencode_server.prompt_async(session_id, message, agent, str(root))
+        sc, result = opencode_server.prompt_async(session_id, message, agent, str(root), model=model, attachments=attachments, root=root)
+        if sc == 400 and isinstance(result, dict) and result.get("ok") is False:
+            self._send_json({"ok": False,
+                             "message": str(result.get("message") or "pièce jointe refusée"),
+                             "code": str(result.get("code") or "ATTACH_ERROR")}, status=400)
+            return
         # OpenCode répond 204 (No Content) sur prompt_async : on renvoie un
         # JSON 200 à l'interface (le message arrive par les événements SSE).
         ok = sc in (200, 201, 202, 204)
@@ -2101,7 +2866,7 @@ class ServerHandler(_mod.Handler):
                          "error": result.get("error") if isinstance(result, dict) and not ok else None})
 
     def _handle_chat_session_stream(self) -> None:
-        """GET /api/chat/stream?session_id=... — flux SSE du tour d'un message agent.
+        """GET /api/chat/stream?session_id=... - flux SSE du tour d'un message agent.
 
         Suit les événements OpenCode 1.19 pour la session demandée et émet un
         format compact :
@@ -2187,10 +2952,10 @@ class ServerHandler(_mod.Handler):
                     pass
 
     def _handle_chat_session_event_sse(self) -> None:
-        """GET /api/chat/session/event — proxy SSE du flux natif `/event`.
+        """GET /api/chat/session/event - proxy SSE du flux natif `/event`.
 
         Le flux `/event` d'OpenCode porte les événements de session
-        (`session.created`, `session.updated` — renommage automatique — et
+        (`session.created`, `session.updated` - renommage automatique - et
         `session.deleted`). Le flux `/global/event` ne porte que les
         événements globaux du serveur : la barre latérale s'abonne donc à
         `/event` pour suivre le cycle de vie des discussions.
@@ -2245,7 +3010,7 @@ class ServerHandler(_mod.Handler):
                     pass
 
     def _handle_chat_global_event_sse(self) -> None:
-        """GET /api/chat/global/event — proxy SSE vers OpenCode /global/event."""
+        """GET /api/chat/global/event - proxy SSE vers OpenCode /global/event."""
         global opencode_server
         if opencode_server is None:
             self._send_json({"ok": False, "message": "OpenCode Server non disponible"}, status=503)
@@ -2340,6 +3105,17 @@ def main() -> int:
     ServerHandler.engine_config = config
     ServerHandler.engine_usable = usable
 
+    # Hook de démarrage : aligner silencieusement ~/.opencode/agent avec les
+    # fiches du projet (modèles d'agents) pour qu'OpenCode les prenne en compte.
+    if sync_home_opencode is not None:
+        try:
+            core_root = _here.parent.parent.parent
+            if not (core_root / "runtimes" / "opencode" / "agents").is_dir():
+                core_root = root
+            sync_home_opencode(root, core_root)
+        except Exception:
+            pass
+
     global watcher_engine
     watcher_engine = WatcherEngine(root)
 
@@ -2347,12 +3123,12 @@ def main() -> int:
     global opencode_server
     opencode_server = OpenCodeServer(root, port=4096)
     if opencode_server.start():
-        print(f"OpenCode Server — http://127.0.0.1:{opencode_server.port}/")
+        print(f"OpenCode Server - http://127.0.0.1:{opencode_server.port}/")
     else:
         print("ATTENTION : OpenCode Server non disponible (opencode serve introuvable).")
         opencode_server = None
 
-    print(f"Sayrhazi serveur — http://localhost:{args.port}/")
+    print(f"Sayrhazi serveur - http://localhost:{args.port}/")
     print(f"Racine : {root}")
     print(f"Moteur : {len(usable)} étape(s) automatique(s)")
     print("Ctrl+C pour arrêter.")

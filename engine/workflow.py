@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Workflow Sayrhazi Lot 2 — parsing tolerant et validation de workflow.yaml.
+"""Workflow Sayrhazi Lot 2 - parsing tolerant et validation de workflow.yaml.
 
 Reference normative : core/workflow/workflow.yaml. Contrat projet :
 `.opencode/workflow.yaml` (modele : runtimes/opencode/templates/workflow.yaml).
