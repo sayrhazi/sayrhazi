@@ -8,6 +8,8 @@
     }
   },
   "permission": {
-    "playwright_*": "deny"
+    "playwright_*": "deny",
+    "external_directory": "ask",
+    "question": "ask"
   }
 }

@@ -3,7 +3,7 @@ name: Lawibrahim
 role: architect
 description: Partenaire de réflexion et architecte Sayrhazi
 mode: primary
-# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/inkling-2-small-free)
-model: opencode/inkling-2-small-free
+# Choisissez votre modèle dans .opencode/models.yaml (ex. opencode/big-pickle)
+model: opencode/big-pickle
 color: "#8B5CF6"
 display_key: agents.architect

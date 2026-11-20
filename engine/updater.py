@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""Update Sayrhazi — met a jour agents + watcher + migre la config.
+"""Update Sayrhazi - met a jour agents + watcher + migre la config.
 
 Copie les fichiers pilotes par le noyau (agent/*.md, watch-work.py) avec
 ecrasement. Migre `.opencode/sayrhazi.yaml` en douceur : cles manquantes du
 template ajoutees (avec backup horodate dans backup/), valeurs existantes
-jamais ecrasees, ligne `version:` alignee sur le noyau. Preserve le reste
-(opencode.json, AGENTS.md, resume/, history/, features/). Signale les
-agent/*.md orphelins.
+jamais ecrasees, ligne `version:` alignee sur le noyau. Merge aussi les regles
+par defaut manquantes dans `.opencode/opencode.json` (question/external_directory
+a `ask`, pret a l'emploi ; valeurs existantes jamais ecrasees). Preserve le
+reste (AGENTS.md, resume/, history/, features/). Signale les agent/*.md orphelins.
 
 Usage :
     python update-sayrhazi.py [--project .]
@@ -119,6 +120,56 @@ def migrate_config(inst_path: Path, tmpl_path: Path, history_dir: Path) -> tuple
     return added, backup, warns
 
 
+def _merged_opencode_defaults(payload: dict) -> list[str]:
+    """Renvoie les ajouts à faire et modifie payload sur place."""
+    added: list[str] = []
+    perm = payload.setdefault("permission", {})
+    defaults = {
+        "external_directory": "ask",
+        "question": "ask",
+    }
+    for key, value in defaults.items():
+        if key not in perm:
+            perm[key] = value
+            added.append(f"permission.{key} = {value!r}")
+    return added
+
+
+def migrate_opencode_json(opencode_path: Path, history_dir: Path) -> list[str]:
+    """Ajoute les regles par defaut manquantes a .opencode/opencode.json.
+
+    N'ecrase rien de ce que l'utilisateur a configure : seules les cles
+    absentes sont ajoutees (avec backup des valeurs existantes non touchees).
+    Retourne la liste des ajouts.
+    """
+    if not opencode_path.is_file():
+        return []
+    try:
+        raw = opencode_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return []
+    try:
+        import json
+        payload = json.loads(raw)
+    except Exception:
+        return []
+    if not isinstance(payload, dict):
+        return []
+    added = _merged_opencode_defaults(payload)
+    if not added:
+        return []
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    history_dir.mkdir(parents=True, exist_ok=True)
+    backup = history_dir / f"opencode-json-backup-{stamp}.json"
+    shutil.copy2(opencode_path, backup)
+    try:
+        opencode_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    except OSError:
+        shutil.copy2(backup, opencode_path)
+        return []
+    return added
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Update Sayrhazi (agents + watcher)")
     parser.add_argument("--project", default=".", help="racine du projet a mettre a jour")
@@ -183,7 +234,7 @@ def main() -> int:
         updated += 1
 
     for name in ("watch-work.py", "services.py", "sayrhazi-modules.py",
-                 "sayrhazi-serveur.py"):
+                 "sayrhazi-serveur.py", "agent_sync.py"):
         src = core / "runtimes" / "opencode" / "scripts" / name
         if src.is_file():
             shutil.copy2(src, opencode / name)
@@ -226,6 +277,10 @@ def main() -> int:
                 break
         (opencode / "sayrhazi.yaml").write_text("\n".join(lines) + "\n", encoding="utf-8")
         print(f"version alignee : {cur} -> {latest}")
+
+    opencode_json = opencode / "opencode.json"
+    for a in migrate_opencode_json(opencode_json, opencode / "backup"):
+        print("  + opencode.json " + a)
 
     core_names = {p.name for p in adapter_agents.glob("*.md")}
     orphans = sorted(p.name for p in (opencode / "agent").glob("*.md") if p.name not in core_names)

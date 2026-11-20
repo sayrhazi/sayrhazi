@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Gestionnaire de services Sayrhazi (Lot 7) — séparé du moteur d'agents.
+"""Gestionnaire de services Sayrhazi (Lot 7) - séparé du moteur d'agents.
 
 Les serveurs frontend/backend sont des processus persistants appartenant au
 projet, pas aux agents : démarrés une fois, ils survivent aux sessions

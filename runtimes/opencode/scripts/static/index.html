@@ -1,15 +1,15 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<title>Sayrhazi — Dashboard</title>
+<title>Sayrhazi - Dashboard</title>
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <div class="sidebar">
   <div class="sidebar-header">
     <h2>Sayrhazi</h2>
-    <span id="sidebar-version" class="badge">—</span>
+    <span id="sidebar-version" class="badge">-</span>
   </div>
   <nav class="sidebar-nav">
     <h3>Tableau de bord</h3>
@@ -27,8 +27,8 @@
   <header class="main-header">
     <h1 id="page-title">Sayrhazi</h1>
     <div class="meta">
-      <span id="status-badge" class="badge">—</span>
-      <span id="watcher-status">—</span>
+      <span id="status-badge" class="badge">-</span>
+      <span id="watcher-status">-</span>
     </div>
     <div class="watcher-controls">
       <button id="btn-watcher-start" class="btn btn-success">Démarrer le watcher</button>
@@ -42,20 +42,20 @@
     <div class="summary-cards">
       <div class="card">
         <h4>Scope</h4>
-        <p id="card-scope">—</p>
+        <p id="card-scope">-</p>
       </div>
       <div class="card">
         <h4>Contrôles</h4>
-        <p id="card-controls">—</p>
+        <p id="card-controls">-</p>
       </div>
       <div class="card">
         <h4>Archivé</h4>
-        <p id="card-archived">—</p>
+        <p id="card-archived">-</p>
       </div>
       <div class="card card-watcher">
         <h4>Watcher</h4>
-        <p id="card-watcher-status" class="badge">—</p>
-        <p id="card-watcher-pid" style="font-size:0.8rem;color:var(--muted)">—</p>
+        <p id="card-watcher-status" class="badge">-</p>
+        <p id="card-watcher-pid" style="font-size:0.8rem;color:var(--muted)">-</p>
       </div>
     </div>
 
@@ -98,16 +98,16 @@
   <!-- Section Agent (affichée quand on clique sur un agent) -->
   <section id="view-agent" class="view hidden">
     <div class="agent-header">
-      <h3 id="agent-detail-title">Rapport — <span id="detail-agent-name"></span></h3>
+      <h3 id="agent-detail-title">Rapport - <span id="detail-agent-name"></span></h3>
       <button id="btn-back-to-chat" class="btn">Retour au chat</button>
     </div>
     <div class="agent-meta">
-      <p><strong>Rôle :</strong> <span id="detail-agent-role">—</span></p>
-      <p><strong>Fichier :</strong> <span id="detail-agent-file">—</span></p>
-      <p><strong>État :</strong> <span id="detail-agent-etat" class="badge">—</span></p>
-      <p><strong>Session :</strong> <span id="detail-agent-session">—</span></p>
-      <p><strong>Origine :</strong> <span id="detail-agent-origine">—</span></p>
-      <p><strong>Rapport :</strong> <span id="detail-agent-report">—</span></p>
+      <p><strong>Rôle :</strong> <span id="detail-agent-role">-</span></p>
+      <p><strong>Fichier :</strong> <span id="detail-agent-file">-</span></p>
+      <p><strong>État :</strong> <span id="detail-agent-etat" class="badge">-</span></p>
+      <p><strong>Session :</strong> <span id="detail-agent-session">-</span></p>
+      <p><strong>Origine :</strong> <span id="detail-agent-origine">-</span></p>
+      <p><strong>Rapport :</strong> <span id="detail-agent-report">-</span></p>
     </div>
     <div class="report-content">
       <pre id="report-content"></pre>
@@ -117,12 +117,12 @@
   <!-- Vue Chat avec les agents -->
   <section id="view-chat" class="view hidden">
     <div class="chat-header">
-      <h3 id="chat-agent-title">Chat — <span id="chat-agent-name"></span></h3>
-      <span id="chat-agent-status" class="badge">—</span>
+       <button id="chat-agent-title" class="chat-agent-title" type="button" aria-haspopup="true" aria-expanded="false" disabled title="Ouvrir les actions de la discussion">Chat - <span id="chat-session-name" class="chat-session-name"></span><span class="chat-title-caret" aria-hidden="true">▾</span></button>
+      <span id="chat-agent-status" class="badge"></span>
       <button id="btn-view-report" class="btn" style="display:none;">Voir rapport</button>
       <button id="btn-debug-json" class="btn" style="display:none;margin-left:0.5rem;">Debug JSON</button>
     </div>
-    <div id="debug-json-panel" style="display:none;margin-top:1rem;padding:1rem;background:#1a1a1a;color:#0f0;font-family:monospace;font-size:0.75rem;overflow:auto;max-height:30rem;border:1px solid #333;white-space:pre-wrap;"></div>
+    <div id="debug-json-panel" style="display:none;margin-top:1rem;padding:1rem;background:#1a1a1a;color:#0f0;font-family:Fira Code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:0.75rem;overflow:auto;max-height:30rem;border:1px solid #333;white-space:pre-wrap;"></div>
     <div class="chat-split">
       <!-- Colonne gauche : liste des sessions -->
       <aside class="chat-sidebar">
@@ -140,15 +140,64 @@
         <div class="chat-conversation" id="chat-conversation">
           <div class="chat-empty">Sélectionnez une session à gauche pour commencer la discussion, ou créez une nouvelle session.</div>
         </div>
+        <div class="revert-banner" id="revert-banner" role="status" aria-live="polite">
+          <div class="revert-banner-row">
+            <span class="revert-banner-icon" aria-hidden="true">↩</span>
+            <span class="revert-banner-text" id="revert-banner-text">1 message reverted</span>
+            <button type="button" class="revert-banner-action" id="revert-banner-undo">Annuler le revert</button>
+          </div>
+          <ul class="revert-banner-files" id="revert-banner-files" hidden></ul>
+        </div>
+        <div class="question-banner" id="question-banner" role="region" aria-label="Questions de l'agent" hidden>
+          <div class="question-banner-row">
+            <span class="question-banner-icon" aria-hidden="true">?</span>
+            <div class="question-banner-main">
+              <div class="question-tabs" id="question-tabs"></div>
+              <div class="question-body" id="question-body"></div>
+            </div>
+          </div>
+          <div class="question-banner-foot">
+            <span class="question-hint">Enter confirme · Esc annule</span>
+            <button type="button" class="question-foot-btn" id="question-foot-dismiss">Annuler</button>
+          </div>
+        </div>
+        <div class="agent-error-banner" id="agent-error-banner" role="alert" hidden>
+          <span class="agent-error-banner-icon" id="agent-error-banner-icon" aria-hidden="true">△</span>
+          <span class="agent-error-banner-text" id="agent-error-banner-text">Upstream request failed</span>
+          <button type="button" class="agent-error-banner-info" id="agent-error-banner-info" title="Détails de l'erreur" aria-label="Détails de l'erreur" hidden>i</button>
+        </div>
+        <div class="chat-agent-working" id="chat-agent-working" role="status" aria-live="polite" hidden>
+          <span class="chat-spinner" aria-hidden="true"></span>
+          <span class="chat-agent-working-text">L'agent est en cours de réponse…</span>
+        </div>
+        <div class="compaction-badge" id="compaction-badge" role="status" aria-live="polite" hidden>
+          <span class="chat-spinner" aria-hidden="true"></span>
+          <span class="compaction-badge-text">Compacting…</span>
+        </div>
+        <div class="chat-autocomplete" id="chat-autocomplete" role="listbox" aria-label="Mention de fichier" hidden></div>
+        <div class="chat-warning-banner" id="chat-warning-banner" role="alert" hidden>
+          <span class="chat-warning-banner-text" id="chat-warning-banner-text"></span>
+        </div>
         <div class="chat-input">
-          <button id="chat-attach-btn" title="Joindre">+</button>
+          <div class="chat-composer" id="chat-composer">
+            <!-- ici les bulles des items joints via '+' -->
+            <div class="chat-attach-list" id="chat-attach-list" role="group" aria-label="Pièces jointes du message" hidden></div>
+            <div class="chat-editor" id="chat-editor">
+              <pre class="chat-highlight" id="chat-highlight" aria-hidden="true"><code id="chat-highlight-code"></code></pre>
+              <textarea id="chat-message-input" placeholder="Écrivez un message à l'agent..." rows="1" spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
+            </div>
+            <div class="chat-composer-bar">
+              <button id="chat-attach-btn" title="Joindre" aria-label="Joindre">+</button>
+              <button class="chat-composer-model" id="chat-composer-model" type="button" title="Modèle et fournisseur de l'agent - cliquer pour changer" aria-haspopup="dialog"></button>
+              <button id="chat-send-btn" title="Envoyer" aria-label="Envoyer" disabled>↑</button>
+            </div>
+          </div>
           <div id="chat-attach-panel" class="chat-attach-panel" style="display:none;">
-            <div class="chat-attach-item" data-action="file">Joindre un fichier</div>
             <div class="chat-attach-item" data-action="files">Fichiers</div>
             <div class="chat-attach-item" data-action="directory">Répertoires</div>
           </div>
-          <textarea id="chat-message-input" placeholder="Écrivez un message à l'agent..." rows="1" spellcheck="false" autocorrect="off" autocomplete="off"></textarea>
-          <button id="chat-send-btn" title="Envoyer">↑</button>
+          <input type="file" id="chat-attach-file-input" multiple accept="*/*" style="display:none;">
+          <input type="file" id="chat-attach-dir-input" multiple accept="*/*" webkitdirectory mozdirectory style="display:none;">
         </div>
       </main>
     </div>

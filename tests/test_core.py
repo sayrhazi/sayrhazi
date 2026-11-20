@@ -2256,7 +2256,7 @@ class TestHomeSyncInstallerUpdate(unittest.TestCase):
             # Changer le modèle dans la fiche du projet puis mettre à jour
             ali = projet / ".opencode" / "agent" / "ali.md"
             avant = ali.read_text(encoding="utf-8")
-            apres = avant.replace("model: opencode/inkling-2-small-free",
+            apres = avant.replace("model: opencode/big-pickle",
                                   "model: opencode/test-modele-x")
             self.assertNotEqual(avant, apres)  # la fiche contient bien le modèle du noyau
             ali.write_text(apres, encoding="utf-8")

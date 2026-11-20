@@ -1,5 +1,5 @@
 /*!
- * hljs.bundle.js — highlight.js 11.12.0 (BSD-3-Clause)
+ * hljs.bundle.js - highlight.js 11.12.0 (BSD-3-Clause)
  * Bundle navigateur genere par engine/build-hljs-bundle.js (core + 38 langages).
  * Ne pas editer a la main : regenerer avec node engine/build-hljs-bundle.js.
  */

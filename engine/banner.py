@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Banner Sayrhazi — ASCII pur (console Windows PS 5.1), stdlib uniquement.
+"""Banner Sayrhazi - ASCII pur (console Windows PS 5.1), stdlib uniquement.
 
 Affiche uniquement via `info sayrhazi` : les autres commandes restent
 analysables en sortie (lignes OK/KO). Version lue depuis VERSION.

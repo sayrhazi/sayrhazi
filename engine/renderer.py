@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Renderer Sayrhazi — genere les .md OpenCode depuis core/agents (trio).
+"""Renderer Sayrhazi - genere les .md OpenCode depuis core/agents (trio).
 
 Source de verite : core/agents/<id>/{agent.yaml, instructions.md}.
 Sortie : runtimes/opencode/agents/<id>.md (frontmatter + corps).

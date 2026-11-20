@@ -1,5 +1,5 @@
 """
-watch-work.py — moteur de transitions Sayrhazi (Lots 4-6).
+watch-work.py - moteur de transitions Sayrhazi (Lots 4-6).
 
 Lit `.opencode/workflow.yaml` et déclenche, pour chaque étape `auto: true`,
 l'agent du rôle lorsque : le rapport déclencheur est stable, son `task_id`
@@ -94,7 +94,7 @@ def isolation_clause(agent: str) -> str:
 
 TASK_RE = re.compile(r"^\s*task_id\s*:\s*(\S+)\s*$", re.MULTILINE | re.IGNORECASE)
 STATUS_RE = re.compile(r"^\s*status\s*:\s*(\S.*?)\s*$", re.MULTILINE | re.IGNORECASE)
-SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) — (Ali|Bamse)$")
+SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) - (Ali|Bamse)$")
 
 
 def log(message: str) -> None:
@@ -724,7 +724,7 @@ def diagnose_restart(project_root: Path) -> None:
         log("pas de marqueur d'arrêt propre (terminal fermé ou processus tué ?).")
     if running and task_id:
         log(f"interruption : {', '.join(running)} retrouvé(s) en cours sur {task_id}"
-            f" — purge, reprise au prochain cycle.")
+            f" - purge, reprise au prochain cycle.")
         journal(project_root, f"interruption détectée (--continue) : {', '.join(running)}"
                               f" en cours sur {task_id}, purge")
         with _SHARED_LOCK:
@@ -963,7 +963,7 @@ def run_branches(project_root: Path, items: list, workers: int, trigger_func=Non
             else:
                 failed.append((key, stage.get("id", "?"), kind))
                 if kind == "quota":
-                    log(f"⚠ QUOTA atteint par {stage.get('agent')} — attente de réinitialisation.")
+                    log(f"⚠ QUOTA atteint par {stage.get('agent')} - attente de réinitialisation.")
                     journal(project_root, f"QUOTA : pause ({stage.get('agent')})")
                     return False, done, failed
                 log("Échec déclenchement, on réessaiera au prochain passage.")
@@ -996,9 +996,9 @@ def run_branches(project_root: Path, items: list, workers: int, trigger_func=Non
                     quota_hit = True
                     quota_agent = next((s.get("agent") for k, s, _t, _w in items if k == key), None)
                     quota_stage = next((s.get("id", "?") for k, s, _t, _w in items if k == key), sid)
-                    log(f"⚠ QUOTA atteint par {quota_agent} — mise en pause de la vague.")
+                    log(f"⚠ QUOTA atteint par {quota_agent} - mise en pause de la vague.")
     if quota_hit:
-        log(f"⚠ QUOTA global détecté ({quota_agent}) — vague en pause. Attente de réinitialisation du quota.")
+        log(f"⚠ QUOTA global détecté ({quota_agent}) - vague en pause. Attente de réinitialisation du quota.")
         journal(project_root, f"QUOTA global : pause vague ({quota_agent})")
         return False, done, failed
     names = {key: stage.get("id", "?") for key, stage, _t, _w in items}
@@ -1162,9 +1162,9 @@ def should_trigger(build_file: Path, last_trigger: str) -> Tuple[bool, str, Opti
         return False, last_trigger, "fichier instable (écriture en cours)"
     task_id, status = parse_build_report(build_file)
     if not task_id:
-        return False, last_trigger, "task_id absent — rapport incomplet, refusé"
+        return False, last_trigger, "task_id absent - rapport incomplet, refusé"
     if status != "TERMINÉ":
-        return False, last_trigger, f"status={status or 'absent'} — attendu TERMINÉ, refusé"
+        return False, last_trigger, f"status={status or 'absent'} - attendu TERMINÉ, refusé"
     # Point 7 du contrat : un review.txt plus récent que build.txt et mentionnant
     # le même task_id prouve que Hadji a déjà traité cette version (même après
     # redémarrage du watcher, où l'anti-double en mémoire est perdu). Un nouveau
@@ -1178,7 +1178,7 @@ def should_trigger(build_file: Path, last_trigger: str) -> Tuple[bool, str, Opti
         if task_id in review_text:
             try:
                 if review_file.stat().st_mtime >= build_file.stat().st_mtime:
-                    return False, last_trigger, f"review.txt existe déjà pour {task_id} — déjà traité"
+                    return False, last_trigger, f"review.txt existe déjà pour {task_id} - déjà traité"
             except OSError:
                 pass
     key = f"{task_id}:{stable_hash}"
@@ -1343,7 +1343,7 @@ def run_generic(root: Path, args, config: Optional[dict], usable: list) -> int:
                 log(f"{sid} : 3 tentatives épuisées, échec normal pour cette version.")
             elif kind == "quota":
                 quota_blocked.add(key)
-                log(f"{sid} : échec — quota/rate limit du provider atteint.")
+                log(f"{sid} : échec - quota/rate limit du provider atteint.")
                 log("Aucun retry automatique pour éviter une boucle sur le quota.")
                 log("Réessayez plus tard ou relancez le watcher.")
             else:

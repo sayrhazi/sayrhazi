@@ -1,4 +1,4 @@
-// diff.esm.js — implémentation maison de diffLines (algorithme de LCS, O(n*m))
+// diff.esm.js - implémentation maison de diffLines (algorithme de LCS, O(n*m))
 // Compatible ESM, aucune dépendance externe côté navigateur.
 // Exporte diffLines(oldText, newText) -> tableau d'opérations {type:'equal'|'delete'|'insert', lines:string[]}
 

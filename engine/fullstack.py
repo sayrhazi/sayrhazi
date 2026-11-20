@@ -6,13 +6,13 @@ Structure :
   scope: fullstack
   status: EN COURS
 
-  ## Étape frontend — Ali
+  ## Étape frontend - Ali
   agent: frontend
   stage_status: TERMINÉ
   completed_at: "2026-10-21T10:00:00Z"
   summary: ...
 
-  ## Étape backend — Bamse
+  ## Étape backend - Bamse
   agent: backend
   stage_status: EN COURS
   completed_at: "2026-10-21T11:00:00Z"
@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) — (Ali|Bamse)$")
+SECTION_HEADER_RE = re.compile(r"^## Étape (frontend|backend) - (Ali|Bamse)$")
 SECTION_AGENT = {"frontend": "frontend", "backend": "backend"}
 VALID_SECTIONS = ("frontend", "backend")
 
@@ -86,7 +86,7 @@ def write_fullstack(
     lines.append("")
     for section in VALID_SECTIONS:
         agent_name = "Ali" if section == "frontend" else "Bamse"
-        lines.append(f"## Étape {section} — {agent_name}")
+        lines.append(f"## Étape {section} - {agent_name}")
         lines.extend(sections.get(section, []))
         lines.append("")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tunda — petit check optionnel de la configuration Sayrhazi d'un projet.
+"""Tunda - petit check optionnel de la configuration Sayrhazi d'un projet.
 
 Alias pour `sayrhazi check sayrhazi`.
 """

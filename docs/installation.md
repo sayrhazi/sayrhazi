@@ -24,25 +24,25 @@ Depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.git`), le sc
 & "<clone>\runtimes\opencode\scripts\Install-Sayrhazi.ps1" -ProjectPath "."
 ```
 
-Le dashboard web (`sayrhazi server`) est l'interface principale : état du workflow, rapports d'agents détaillés, création et suppression de discussions (titre renommé automatiquement par OpenCode, synchronisé — sessionID réel), streaming token par token avec indicateurs d'activité, pied de bulle agent (modèle + durée de tour), bouton de copie sous le message utilisateur. Il s'ouvre sur `http://localhost:8363`.
+Le dashboard web (`sayrhazi server`) est l'interface principale : état du workflow, rapports d'agents détaillés, création et suppression de discussions (titre renommé automatiquement par OpenCode, synchronisé - sessionID réel), streaming token par token avec indicateurs d'activité, pied de bulle agent (modèle + durée de tour), bouton de copie sous le message utilisateur. Il s'ouvre sur `http://localhost:8363`.
 
 ## Référence des commandes `sayrhazi`
 
-Toutes les commandes s'utilisent sous la forme **`sayrhazi <commande>`** — cela
+Toutes les commandes s'utilisent sous la forme **`sayrhazi <commande>`** - cela
 fonctionne **identiquement** sur Windows (PowerShell) et Linux (bash), sans
 profil à sourcer.
 
 | Commande | Description | Alias |
 |---|---|---|
 | `sayrhazi` | Installe Sayrhazi dans le dossier courant (ou chemin donné) | `sayrhazi .` |
-| `sayrhazi install` | Installe explicitement | — |
+| `sayrhazi install` | Installe explicitement | - |
 | `sayrhazi check` | Vérifie la configuration du projet (tunda) | `sayrhazi tunda` |
 | `sayrhazi tunda` | Alias de `check` | `sayrhazi check` |
-| `sayrhazi info` | Affiche version noyau, version projet, agents, rapports | — |
-| `sayrhazi update` | Met à jour le projet vers la version noyau | — |
-| `sayrhazi remove` | Supprime les fichiers noyau (simulation sans `--yes`) | — |
-| `sayrhazi server` | Lance le serveur web (dashboard + watcher, port 8363) | — |
-| `sayrhazi --version` | Affiche la version du noyau | — |
+| `sayrhazi info` | Affiche version noyau, version projet, agents, rapports | - |
+| `sayrhazi update` | Met à jour le projet vers la version noyau | - |
+| `sayrhazi remove` | Supprime les fichiers noyau (simulation sans `--yes`) | - |
+| `sayrhazi server` | Lance le serveur web (dashboard + watcher, port 8363) | - |
+| `sayrhazi --version` | Affiche la version du noyau | - |
 
 **Options communes** :
 
@@ -62,7 +62,7 @@ Le dashboard web (`sayrhazi-serveur.py`, servi par le serveur unifié)
 s'ouvre sur **`http://localhost:8363`** via `sayrhazi server`. C'est l'interface
 graphique de Sayrhazi : état du workflow, rapports des agents, création et suppression
 de discussions avec les agents via l'API native OpenCode (renommage automatique
-du titre, synchronisé — sessionID réel), streaming token par token avec
+du titre, synchronisé - sessionID réel), streaming token par token avec
 indicateurs d'activité, pied de bulle agent (modèle + durée de tour) et bouton
 de copie sous le message utilisateur.
 
@@ -83,7 +83,7 @@ cd <clone>
 
 Le lanceur npm utilise `python3` hors Windows. Deux différences avec Windows méritent d'être connues, toutes deux rencontrées à l'usage :
 
-**`yarn add` n'installe pas la commande sur le PATH.** `yarn add` place le binaire dans `./node_modules/.bin`, qui n'est pas dans le PATH : `sayrhazi` reste « commande introuvable ». Seul `npm install -g sayrhazi` installe réellement la commande. De même, `yarn remove -r sayrhazi` est une erreur — `-r` signifie *recursive* et attend des workspaces ; la commande est `yarn remove sayrhazi`.
+**`yarn add` n'installe pas la commande sur le PATH.** `yarn add` place le binaire dans `./node_modules/.bin`, qui n'est pas dans le PATH : `sayrhazi` reste « commande introuvable ». Seul `npm install -g sayrhazi` installe réellement la commande. De même, `yarn remove -r sayrhazi` est une erreur - `-r` signifie *recursive* et attend des workspaces ; la commande est `yarn remove sayrhazi`.
 
 Rendre le script exécutable puis l'appeler avec la racine du projet :
 
@@ -97,6 +97,8 @@ Sous Linux, seules les commandes du binaire npm sont nécessaires (`sayrhazi`). 
 ## Ce que fait l'installation
 
 Le script crée `.opencode/agent/`, `resume/`, `history/`, `features/`, `state/` et `backup/`, puis copie les six agents génériques, `watch-work.py` (orchestrateur), `services.py` (gestionnaire de services), `sayrhazi-modules.py` (briques partagées : lecture OpenCode + `Handler` web), `sayrhazi-serveur.py` + `static/` (dashboard web) (serveur unifié : dashboard web + moteur watcher dans un seul processus) et `models.yaml` (fenêtres de contexte connues), tous mis à jour à chaque installation. `.opencode/state/` (`workflow-state.yaml`, vue de coordination) est local à la machine : ajoutez-le au `.gitignore` du projet. Il crée `AGENTS.md`, `sayrhazi.yaml` et `opencode.json` uniquement lorsqu'ils sont absents. Il ne supprime ni ne remplace les rapports, historiques, décisions ou configuration déjà présents. Le dossier personnel OpenCode (`~/.opencode/agent/`) est aussi synchronisé : OpenCode y lit le `model:` de chaque agent au lancement, donc tout changement de modèle du projet s'y répercute sur toutes les sessions (installateurs shell et PowerShell idem).
+
+Le template `opencode.json` du noyau déclare par défaut les permissions `question` et `external_directory` en mode `ask` (les modals natives d'OpenCode s'ouvrent pour ces deux actions) ; les autres actions (bash, edit, read, grep, webfetch, …) restent à leur valeur par défaut d'OpenCode. En projet existant, `sayrhazi update` ajoute ces deux clés si elles sont absentes (avec backup, sans écraser les clés déjà présentes).
 
 Les fichiers d'agents sont les fichiers fournis par Sayrhazi et peuvent être actualisés par une future version. Pour un projet existant, effectuer un commit ou une sauvegarde avant toute mise à jour et relire les différences.
 

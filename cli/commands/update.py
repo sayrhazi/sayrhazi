@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI update — delegue a engine/updater.py."""
+"""CLI update - delegue a engine/updater.py."""
 from __future__ import annotations
 
 import subprocess

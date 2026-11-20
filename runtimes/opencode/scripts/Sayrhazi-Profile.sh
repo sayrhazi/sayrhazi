@@ -1,6 +1,6 @@
-# Sayrhazi-Profile.sh — fonctions shell Sayrhazi (versionné dans le dépôt).
+# Sayrhazi-Profile.sh - fonctions shell Sayrhazi (versionné dans le dépôt).
 #
-# Sourcing (une fois, dans ~/.bashrc) — SAYRHAZI_HOME pointe vers le noyau
+# Sourcing (une fois, dans ~/.bashrc) - SAYRHAZI_HOME pointe vers le noyau
 # (clone ou paquet npm : $(npm root -g)/sayrhazi) :
 #   export SAYRHAZI_HOME="$HOME/sayrhazi"
 #   . "$SAYRHAZI_HOME/runtimes/opencode/scripts/Sayrhazi-Profile.sh"

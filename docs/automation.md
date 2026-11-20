@@ -71,7 +71,7 @@ La réconciliation lit l'état, relit `workflow.yaml`, vérifie les rapports du 
 
 Le watcher est devenu un moteur piloté par `.opencode/workflow.yaml` : pour chaque étape `auto: true`, il vérifie rapport stable, `task_id` + statut autorisés, condition satisfaite et sortie non existante, puis appelle l'agent du rôle (prompt, minuteur, durée, vérification du rapport produit). Verrou d'instance unique, anti-double en mémoire + sortie existante (point 7), journal `history/workflow-log.md`, mise à jour minimale de `state/workflow-state.yaml`. Sans `workflow.yaml` valide, repli sur la transition historique `backend.txt TERMINÉ → Hadji`, sans jamais planter.
 
-Les conditions se résolvent depuis `sayrhazi.yaml` (`visual_qa_required` → Zawadi, `security_audit_required_by_default` → Hifadhui ; `design_required` sans indicateur : Ali reste manuel). Sont automatiques : `review` (toujours), `security` et `visual_qa` (si requis), `rework` (retour vers Bamse sur `CORRECTIONS NÉCESSAIRES`, sauf `backend.txt` plus récent), `rework_qa` (retour vers Bamse sur `qa.txt À COMPLÉTER` : Zawadi attend une action — purge cache, relance frontal, fix env — puis recontrôle). Pour les tâches `fullstack`, l'étape `backend` est verrouillée tant que la section `frontend` de `fullstack.txt` n'est pas `TERMINÉ` : Bamse ne démarre pas avant qu'Ali n'ait terminé sa partie. Étapes inconnues ou cassées : signalées et ignorées, jamais devinées. `tunda sayrhazi` affiche les agents requis, manuels et inactifs de la configuration.
+Les conditions se résolvent depuis `sayrhazi.yaml` (`visual_qa_required` → Zawadi, `security_audit_required_by_default` → Hifadhui ; `design_required` sans indicateur : Ali reste manuel). Sont automatiques : `review` (toujours), `security` et `visual_qa` (si requis), `rework` (retour vers Bamse sur `CORRECTIONS NÉCESSAIRES`, sauf `backend.txt` plus récent), `rework_qa` (retour vers Bamse sur `qa.txt À COMPLÉTER` : Zawadi attend une action - purge cache, relance frontal, fix env - puis recontrôle). Pour les tâches `fullstack`, l'étape `backend` est verrouillée tant que la section `frontend` de `fullstack.txt` n'est pas `TERMINÉ` : Bamse ne démarre pas avant qu'Ali n'ait terminé sa partie. Étapes inconnues ou cassées : signalées et ignorées, jamais devinées. `tunda sayrhazi` affiche les agents requis, manuels et inactifs de la configuration.
 
 Les étapes éligibles ensemble partent en parallèle (threads stdlib), bornées par `workflow.max_parallel_agents` (défaut 3, garde-fou machine). La convergence est journalisée (`Convergence : review OK, security OK (2/2)`) : un échec (timeout, erreur) n'empêche jamais les autres branches, qui écrivent chacune leur rapport ; la branche échouée sera réévaluée au prochain changement. `running_agents` reflète l'ensemble en cours. Séquentiel si une seule étape éligible, repli historique sinon.
 
@@ -99,8 +99,8 @@ Jusqu'à 0.12.x, le watcher réutilisait `--session` par (tâche, agent) et esti
 
 Le dashboard observe, il ne pilote rien. Pour chaque agent il liste **toutes** ses sessions sur le projet et distingue les deux origines :
 
-* **Auto** — le titre porte le préfixe `Sayrhazi <task_id> <agent> `, donc la session a été ouverte par le watcher ;
-* **Manu** — titre libre, session ouverte à la main depuis un terminal (Lawibrahim, Bamse désactivé, Ali, tout appel direct).
+* **Auto** - le titre porte le préfixe `Sayrhazi <task_id> <agent> `, donc la session a été ouverte par le watcher ;
+* **Manu** - titre libre, session ouverte à la main depuis un terminal (Lawibrahim, Bamse désactivé, Ali, tout appel direct).
 
 Un agent manuel consomme autant de contexte qu'un appel automatique, il est donc affiché au même titre. Le filtre reste strict sur le projet et l'agent : jamais la session d'un autre agent ou d'un autre projet ; à défaut, `n/d`.
 
@@ -112,17 +112,17 @@ La ligne affiche la session **la plus récemment active** de l'agent, quelle que
 
 La ligne sépare visuellement deux groupes de colonnes, parce qu'ils ne mesurent pas la même chose. Les confondre laissait croire qu'un compteur d'historique décrivait la session affichée.
 
-**Bloc session** — `Session`, `Origine`, `Jauge`, `Tokens`, `%`, `Coût sess.`
+**Bloc session** - `Session`, `Origine`, `Jauge`, `Tokens`, `%`, `Coût sess.`
 
 Décrivent **uniquement** la session affichée, celle dont l'ID est donné dans la ligne. Quand la vague suivante ouvre une session neuve, ces valeurs changent avec elle et suivent le nouvel ID. Elles ne sont jamais sommées d'une session à l'autre : additionner des fenêtres de contextes différents n'a pas de sens.
 
-**Bloc projet** — `Auto`, `Manuel`, `Coût proj.`
+**Bloc projet** - `Auto`, `Manuel`, `Coût proj.`
 
 Agrègent **toutes** les sessions de cet agent sur ce projet, toutes tâches confondues. `Auto = 2` signifie « deux appels du watcher depuis le début du projet », pas « deux appels dans la session affichée ». Pour une facture, l'addition a un sens ; pour un contexte, jamais.
 
-* **Contexte du dernier message** — reproduit la formule du panneau Context d'OpenCode : dernier message assistant **portant une mesure**, `input + output + reasoning + cache.read + cache.write`, divisé par la fenêtre de contexte du modèle. Ce pourcentage décrit ce message, pas le cumul de la session.
+* **Contexte du dernier message** - reproduit la formule du panneau Context d'OpenCode : dernier message assistant **portant une mesure**, `input + output + reasoning + cache.read + cache.write`, divisé par la fenêtre de contexte du modèle. Ce pourcentage décrit ce message, pas le cumul de la session.
 
-Un message assistant dont le contexte vaut zéro n'est pas une mesure : le dashboard le saute. Deux formes existent dans la base d'OpenCode — le message ouvert au début d'un run (`finish` absent) et un tour interrompu (`finish: "unknown"`, chaîne non vide, qu'un simple test sur la présence de `finish` ne peut pas écarter). Le dashboard garde alors la dernière valeur réelle au lieu de retomber à zéro pendant l'exécution.
+Un message assistant dont le contexte vaut zéro n'est pas une mesure : le dashboard le saute. Deux formes existent dans la base d'OpenCode - le message ouvert au début d'un run (`finish` absent) et un tour interrompu (`finish: "unknown"`, chaîne non vide, qu'un simple test sur la présence de `finish` ne peut pas écarter). Le dashboard garde alors la dernière valeur réelle au lieu de retomber à zéro pendant l'exécution.
 
 La compaction d'OpenCode n'a pas de cas particulier : elle est marquée par un part `compaction` attaché à un message **user**, jamais à un message assistant. Le dashboard n'y voit qu'une baisse de contexte et affiche normalement la nouvelle valeur.
 
@@ -135,24 +135,24 @@ OpenCode ne stocke nulle part la fenêtre de contexte d'un modèle (ni en base, 
 Sous le tableau, un panneau suit la ligne sélectionnée (flèches du clavier ou clic, aucune touche supplémentaire). Il reprend ce que la ligne ne peut pas contenir faute de place : modèle et fenêtre, coût de session, horodatages, et surtout la **décomposition du contexte** telle qu'OpenCode l'a comptée :
 
 ```text
-modèle    opencode/inkling-2-small-free  ·  fenêtre 1 048 576
+  modèle    opencode/big-pickle  ·  fenêtre 200 000
 contexte  572 128 tokens =  55 % de la fenêtre
           input 715  cache.read 570 993  cache.write 0  output 420  reasoning 0
 ```
 
-La décomposition n'est pas décorative : `cache.read` domine presque toujours. Sur les sessions réelles de Sayrhazi-web, il représente 99 % du contexte de Bamse (570 993 sur 572 128) et 98 % de celui de Hadji (51 441 sur 52 282). Sans cette ligne, « 55 % de fenêtre » laisse croire que l'agent a produit 572 K tokens ; il n'a quasi rien produit et relu le projet — deux coûts très différents.
+La décomposition n'est pas décorative : `cache.read` domine presque toujours. Sur les sessions réelles de Sayrhazi-web, il représente 99 % du contexte de Bamse (570 993 sur 572 128) et 98 % de celui de Hadji (51 441 sur 52 282). Sans cette ligne, « 55 % de fenêtre » laisse croire que l'agent a produit 572 K tokens ; il n'a quasi rien produit et relu le projet - deux coûts très différents.
 
 Un agent sans mesure affiche `n/d` partout : aucun pourcentage, aucune durée, aucun coût ne sont inventés.
 
 La sélection survit au rafraîchissement. Le tableau est reconstruit à chaque tick, ce qui réinitialisait le curseur sur la première ligne : cliquer sur hadji perdait la surbrillance en une seconde. L'agent sous le curseur est mémorisé **par son rôle** et restauré après reconstruction, pas par index, pour survivre à tout réordonnancement des lignes.
 
-En cas de timeout, le watcher vérifie si le rapport a quand même été produit (le processus peut rester bloqué après l'écriture, ex. serveur de prévisualisation laissé actif) : rapport présent → succès acté, sans retry. Les retries réseau/timeout sont à un seul coup (pas de réveil permanent) et la ligne `État :` ne s'affiche qu'en cas de changement — fini le spam toutes les 3 secondes.
+En cas de timeout, le watcher vérifie si le rapport a quand même été produit (le processus peut rester bloqué après l'écriture, ex. serveur de prévisualisation laissé actif) : rapport présent → succès acté, sans retry. Les retries réseau/timeout sont à un seul coup (pas de réveil permanent) et la ligne `État :` ne s'affiche qu'en cas de changement - fini le spam toutes les 3 secondes.
 
 ## Reprise après interruption (`--continue`)
 
 Un Ctrl+C au repos écrit un marqueur d'arrêt propre (`.opencode/state/clean_stop`) ; un arrêt brutal (terminal fermé, processus tué) n'en laisse pas. Relancé avec `--continue`, le watcher diagnostique : marqueur présent/absent, agents retrouvés en cours dans l'état (purge), appels sans terminaison au journal, pause quota enregistrée. Puis la boucle normale reprend le travail inachevé (rapports et point 7). Sans le flag, le démarrage reste silencieux comme avant.
 
-La console colore les mots importants (agents, `task_id`, pourcentages, `ERREUR`/`ATTENTION`) et affiche le modèle de chaque agent appelé (`[inkling-2-small-free]`, lu dans le frontmatter de `.opencode/agent/*.md`) ; le journal fichier reste en texte brut, avec le nom complet du modèle. Pour la lisibilité, chaque vague de déclenchements est encadrée (`########## vague : … ##########`) et la sortie de chaque agent est encadrée (`============ AGENT · … ============` … `============ FIN · … ============`).
+La console colore les mots importants (agents, `task_id`, pourcentages, `ERREUR`/`ATTENTION`) et affiche le modèle de chaque agent appelé (`[big-pickle]`, lu dans le frontmatter de `.opencode/agent/*.md`) ; le journal fichier reste en texte brut, avec le nom complet du modèle. Pour la lisibilité, chaque vague de déclenchements est encadrée (`########## vague : … ##########`) et la sortie de chaque agent est encadrée (`============ AGENT · … ============` … `============ FIN · … ============`).
 
 ## Dashboard web (servi par `sayrhazi-serveur.py`)
 
@@ -160,7 +160,7 @@ Le dashboard web présente une interface HTML autonome sur `http://localhost:836
 
 Le serveur unifié `sayrhazi-serveur.py` assure les deux rôles dans un seul processus : servir le dashboard web et lancer/arrêter le watcher (`watch-work.py`). Le watcher est aussi accessible depuis la barre de navigation (`?start`/`?stop`). Les assets front (`static/`) sont servis avec `Cache-Control: no-store`.
 
-Les discussions sont ouvertes en bas (dernier message visible). Supprimer une discussion efface aussi les sessions enfants d'OpenCode — la suppression passe par l'endpoint natif `DELETE /session/:id`. Le renommage automatique du titre utilise l'agent natif `title` d'OpenCode, déclenché par le premier message utilisateur.
+Les discussions sont ouvertes en bas (dernier message visible). Supprimer une discussion efface aussi les sessions enfants d'OpenCode - la suppression passe par l'endpoint natif `DELETE /session/:id`. Le renommage automatique du titre utilise l'agent natif `title` d'OpenCode, déclenché par le premier message utilisateur.
 
 ## Services séparés
 

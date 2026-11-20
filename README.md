@@ -10,7 +10,7 @@
 ║    \___ \ / _` | | | | '__| '_ \ / _` |_  / | |   ║
 ║     ___) | (_| | |_| | |  | | | | (_| |/ /__| |   ║
 ║    |____/ \__,_|\__, |_|  |_| |_|\__,_/_____|_|   ║
-║                 |___/  v0.15.0 - sayrhazi          ║
+║                 |___/  v0.16.0 - sayrhazi          ║
 ║                                                   ║
 ╚═══════════════════════════════════════════════════╝
 ```
@@ -51,20 +51,20 @@ Tous les agents respectent les règles communes (`AGENTS.md` du projet) : lire `
 
 | Agent | Fichier | Rôle | Modèle | Couleur |
 |---|---|---|---|---|
-| **Lawibrahim** | `agent/lawibrahim.md` | Partenaire de réflexion — clarifie le besoin, classe le scope (`frontend`, `backend`, `fullstack`), déclare les contrôles requis et le contrat d'échange. N'implémente et ne review jamais. Archive les features bouclées dans `.opencode/features/`. | `muse-spark-1.3` | `#8B5CF6` |
-| **Ali** | `agent/ali.md` | Interface frontend — maquettes, écrans, composants, responsive, thèmes. Écrit `frontend.txt` (scope `frontend`) ou sa section de `fullstack.txt` (scope `fullstack`, d'abord, avant Bamse). Ne touche ni à l'existant ni à la logique. | `muse-spark-1.3` (vision) | `#3B82F6` |
-| **Bamse** | `agent/bamse.md` | Backend et logique serveur — implémente à partir de `plan.txt`, vérifie, écrit `backend.txt` (scope `backend`) ou sa section de `fullstack.txt` (scope `fullstack`, après Ali seulement). Seul à modifier le code existant et la logique. | `muse-spark-1.3` | `#22C55E` |
-| **Hadji** | `agent/hadji.md` | Reviewer qualité — bugs, régressions, architecture, performance. Rend le verdict qualité final (`VALIDÉ` / `VALIDÉ AVEC RÉSERVES` / `CORRECTIONS NÉCESSAIRES`). **Ne couvre pas la sécurité.** | `muse-spark-1.3` | `#F59E0B` |
-| **Hifadhui** | `agent/hifadhui.md` | Spécialiste sécurité — injections, auth/sessions, secrets, dépendances, contrôle d'accès. Son verdict KO bloque la clôture et l'archivage. | `muse-spark-1.3` | `#EF4444` |
-| **Zawadi** | `agent/zawadi.md` | Testeuse QA visuelle et fonctionnelle — rendu réel, responsive, modes clair/sombre, parcours. Teste après Ali (frontal) et/ou après Bamse (parcours intégré) selon le plan. Ne déduit jamais un rendu du seul code. | `muse-spark-1.3` (vision) | `#14B8A6` |
+| **Lawibrahim** | `agent/lawibrahim.md` | Partenaire de réflexion - clarifie le besoin, classe le scope (`frontend`, `backend`, `fullstack`), déclare les contrôles requis et le contrat d'échange. N'implémente et ne review jamais. Archive les features bouclées dans `.opencode/features/`. | `opencode/big-pickle` | `#8B5CF6` |
+| **Ali** | `agent/ali.md` | Interface frontend - maquettes, écrans, composants, responsive, thèmes. Écrit `frontend.txt` (scope `frontend`) ou sa section de `fullstack.txt` (scope `fullstack`, d'abord, avant Bamse). Ne touche ni à l'existant ni à la logique. | `opencode/big-pickle` (vision) | `#3B82F6` |
+| **Bamse** | `agent/bamse.md` | Backend et logique serveur - implémente à partir de `plan.txt`, vérifie, écrit `backend.txt` (scope `backend`) ou sa section de `fullstack.txt` (scope `fullstack`, après Ali seulement). Seul à modifier le code existant et la logique. | `opencode/big-pickle` | `#22C55E` |
+| **Hadji** | `agent/hadji.md` | Reviewer qualité - bugs, régressions, architecture, performance. Rend le verdict qualité final (`VALIDÉ` / `VALIDÉ AVEC RÉSERVES` / `CORRECTIONS NÉCESSAIRES`). **Ne couvre pas la sécurité.** | `opencode/big-pickle` | `#F59E0B` |
+| **Hifadhui** | `agent/hifadhui.md` | Spécialiste sécurité - injections, auth/sessions, secrets, dépendances, contrôle d'accès. Son verdict KO bloque la clôture et l'archivage. | `opencode/big-pickle` | `#EF4444` |
+| **Zawadi** | `agent/zawadi.md` | Testeuse QA visuelle et fonctionnelle - rendu réel, responsive, modes clair/sombre, parcours. Teste après Ali (frontal) et/ou après Bamse (parcours intégré) selon le plan. Ne déduit jamais un rendu du seul code. | `opencode/big-pickle` (vision) | `#14B8A6` |
 
-Tous en `mode: primary` — on parle à un seul agent à la fois. Flux par scope : `frontend` → Lawibrahim → Ali → Zawadi (si requis) → Hadji ; `backend` → Lawibrahim → Bamse → Hifadhui (si requis) → Zawadi (si requis) → Hadji ; `fullstack` → Lawibrahim → Ali (section frontend) → Bamse (section backend, après Ali TERMINÉ) → contrôles requis → Hadji (verdict final) → archivage par Lawibrahim après OK global. Hifadhui sur les zones à risque. Les noms d'affichage sont modifiables par projet via `agents:` dans `sayrhazi.yaml` (fichiers et rôles stables).
+Tous en `mode: primary` - on parle à un seul agent à la fois. Flux par scope : `frontend` → Lawibrahim → Ali → Zawadi (si requis) → Hadji ; `backend` → Lawibrahim → Bamse → Hifadhui (si requis) → Zawadi (si requis) → Hadji ; `fullstack` → Lawibrahim → Ali (section frontend) → Bamse (section backend, après Ali TERMINÉ) → contrôles requis → Hadji (verdict final) → archivage par Lawibrahim après OK global. Hifadhui sur les zones à risque. Les noms d'affichage sont modifiables par projet via `agents:` dans `sayrhazi.yaml` (fichiers et rôles stables).
 
 ## Les fichiers de suivi
 
 ### État courant (`.opencode/resume/`)
 
-Chaque fichier est **remplacé** à chaque passage — il ne contient que le dernier état, pour rester rapide à lire.
+Chaque fichier est **remplacé** à chaque passage - il ne contient que le dernier état, pour rester rapide à lire.
 
 | Fichier | Écrit par | Lu par |
 |---|---|---|
@@ -88,13 +88,13 @@ Avant de remplacer son fichier `resume/`, chaque agent archive l'ancien contenu 
 
 ## Comment ça se déroule concrètement
 
-1. **Discussion** — avec Lawibrahim. Il classe la tâche par scope (`frontend`, `backend` ou `fullstack`), déclare les contrôles requis et le contrat d'échange dans `plan.txt` (`À IMPLÉMENTER`, `INFORMATIF`, puis `VALIDÉ` quand la décision est prise), uniquement après confirmation explicite.
-2. **Implémentation** — scope `frontend` : Ali écrit `frontend.txt` (`EN COURS`, `TERMINÉ` ou `BLOQUÉ`). Scope `backend` : Bamse écrit `backend.txt`. Scope `fullstack` : Ali écrit sa section de `fullstack.txt` **d'abord**, puis Bamse écrit sa section de `fullstack.txt` uniquement quand la section frontend est `TERMINÉ`.
-3. **Vérifications** — selon les contrôles déclarés dans le plan : Zawadi (QA frontend après Ali, QA intégré après Bamse si requis), Hifadhui (audit sécurité si requis), Hadji (review qualité globale).
-4. **Review qualité** — Hadji lit le rapport d'implémentation (`frontend.txt`, `backend.txt` ou `fullstack.txt` selon le scope), inspecte le code, écrit `review.txt` (`VALIDÉ`, `VALIDÉ AVEC RÉSERVES` ou `CORRECTIONS NÉCESSAIRES`). Déclenchable auto via `watch-work.py`.
-6. **Rework** — si un contrôle est KO, la correction revient à l'agent responsable (Ali pour le frontend, Bamse pour le backend, Lawibrahim pour le contrat d'échange). Les contrôles affectés sont rejoués.
-7. **Archivage** — lorsque tous les contrôles requis sont OK et que Hadji a rendu son verdict final OK, Lawibrahim archive l'artefact complet dans `history/fullstack-log.md` (scope `fullstack`) ou dans l'historique correspondant (scopes simples). L'archivage est idempotent (clé : `task_id`).
-8. **Terminé** — la tâche est clôturée et l'artefact courant peut être réinitialisé uniquement après vérification que l'archive est complète.
+1. **Discussion** - avec Lawibrahim. Il classe la tâche par scope (`frontend`, `backend` ou `fullstack`), déclare les contrôles requis et le contrat d'échange dans `plan.txt` (`À IMPLÉMENTER`, `INFORMATIF`, puis `VALIDÉ` quand la décision est prise), uniquement après confirmation explicite.
+2. **Implémentation** - scope `frontend` : Ali écrit `frontend.txt` (`EN COURS`, `TERMINÉ` ou `BLOQUÉ`). Scope `backend` : Bamse écrit `backend.txt`. Scope `fullstack` : Ali écrit sa section de `fullstack.txt` **d'abord**, puis Bamse écrit sa section de `fullstack.txt` uniquement quand la section frontend est `TERMINÉ`.
+3. **Vérifications** - selon les contrôles déclarés dans le plan : Zawadi (QA frontend après Ali, QA intégré après Bamse si requis), Hifadhui (audit sécurité si requis), Hadji (review qualité globale).
+4. **Review qualité** - Hadji lit le rapport d'implémentation (`frontend.txt`, `backend.txt` ou `fullstack.txt` selon le scope), inspecte le code, écrit `review.txt` (`VALIDÉ`, `VALIDÉ AVEC RÉSERVES` ou `CORRECTIONS NÉCESSAIRES`). Déclenchable auto via `watch-work.py`.
+6. **Rework** - si un contrôle est KO, la correction revient à l'agent responsable (Ali pour le frontend, Bamse pour le backend, Lawibrahim pour le contrat d'échange). Les contrôles affectés sont rejoués.
+7. **Archivage** - lorsque tous les contrôles requis sont OK et que Hadji a rendu son verdict final OK, Lawibrahim archive l'artefact complet dans `history/fullstack-log.md` (scope `fullstack`) ou dans l'historique correspondant (scopes simples). L'archivage est idempotent (clé : `task_id`).
+8. **Terminé** - la tâche est clôturée et l'artefact courant peut être réinitialisé uniquement après vérification que l'archive est complète.
 
 ## Docker est-il nécessaire ?
 
@@ -112,6 +112,8 @@ MonProjet/     # projet : code + .opencode/ + AGENTS.md
 ```
 
 Chaque projet possède sa propre copie de `.opencode/agent/` (`sayrhazi.yaml`, `workflow.yaml`, `opencode.json`, `watch-work.py`, `resume/`, `history/`, `features/`, `state/` local à ignorer par git). `.opencode/workflow.yaml` décrit le parcours déclaratif (étapes, déclencheurs, conditions) ; seule la transition `build → Hadji` est automatique, le reste est orchestré par l'humain. Les rapports et historiques ne sont jamais partagés entre projets. Les agents ne supposent jamais le nom du projet : ils lisent `.opencode/sayrhazi.yaml`.
+
+Par défaut, `opencode.json` demande `question` et `external_directory` en mode `ask` (modals natives d'OpenCode) ; `sayrhazi update` ajoute ces clés si elles sont absentes (sans écraser les vôtres) et crée `opencode.json` selon le template du noyau.
 
 ## Installation dans un projet
 
@@ -148,7 +150,7 @@ Les crochets indiquent un argument optionnel : sans argument, la commande vise l
 | `sayrhazi [chemin]` | installe + contrôle | Agents + watcher recopiés, config créée si absente, état préservé |
 | `sayrhazi check [chemin]` | diagnostic rapide | Vérifie que Sayrhazi est initialisé dans le projet (agents, dossiers, config) |
 | `sayrhazi tunda [chemin]` | diagnostic détaillé | Checklist : structure, 6 agents, 0 `A_COMPLETER`, schéma, contrats des rapports + `workflow.yaml` (signalés, jamais bloquants), version vs noyau (exit 0/1/2) |
-| `sayrhazi update [chemin]` | mise à jour | Agents + watcher recopiés, migration douce + backup, version alignée, check relancé |
+| `sayrhazi update [chemin]` | mise à jour | Agents + watcher recopiés, migration douce + backup (sayrhazi.yaml et opencode.json), version alignée, check relancé |
 | `sayrhazi info [chemin]` | renseigne | Banner + versions noyau/installé, agents présents, rapports (lecture seule) |
 | `sayrhazi remove [chemin] [--yes]` | retire prudemment | Simulation puis confirmation ; fichiers noyau seuls, jamais config/rapports/historique |
 | `sayrhazi server [--port N] [--root chemin]` | dashboard web | Lance `.opencode/sayrhazi-serveur.py` : http://localhost:8363 par défaut (dashboard + conversations avec les agents) |

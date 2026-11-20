@@ -1,6 +1,6 @@
-# Sayrhazi-Profile.ps1 — fonctions de profil Sayrhazi (versionné dans le dépôt).
+# Sayrhazi-Profile.ps1 - fonctions de profil Sayrhazi (versionné dans le dépôt).
 #
-# Sourcing (une fois, dans $PROFILE) — remplace tout bloc Sayrhazi existant :
+# Sourcing (une fois, dans $PROFILE) - remplace tout bloc Sayrhazi existant :
 #   $env:SAYRHAZI_HOME = "C:\chemin\vers\Sayrhazi"
 #   . "$env:SAYRHAZI_HOME\runtimes\opencode\scripts\Sayrhazi-Profile.ps1"
 #
