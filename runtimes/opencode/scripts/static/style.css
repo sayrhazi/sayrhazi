@@ -1274,8 +1274,17 @@ td.etat {
 .chat-attach-files {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
   margin-bottom: 0.25rem;
+}
+
+.chat-attach-images {
+  gap: 0.6rem;
+  margin-top: 0.4rem;
+  margin-bottom: 0;
+}
+
+.chat-attach-files {
+  gap: 0.35rem;
 }
 
 .chat-attach-chip {

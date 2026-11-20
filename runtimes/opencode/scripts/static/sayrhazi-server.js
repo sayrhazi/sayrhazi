@@ -2228,6 +2228,26 @@ function applyRevertVisual(anchorEl, text, messageId, diffFiles, filesLoading) {
     input.focus();
     renderMentionHighlight();
   }
+  // Restaurer les attachments (images/items via « + ») du message reverté.
+  var revertMsg = remoteMessages && remoteMessages[messageId] ? remoteMessages[messageId] : null;
+  var revertItems = revertMsg && Array.isArray(revertMsg.items) ? revertMsg.items : [];
+  var restored = [];
+  revertItems.forEach(function (it) {
+    if (it && (it.kind === "tool") && (String(it.tool || "").toUpperCase() === "FILE" || it.url || it.mime)) {
+      var sp = String(it.source_path || "");
+      var isMentionFile = sp && sp.indexOf("data:") !== 0 && sp.indexOf("http") !== 0;
+      if (isMentionFile && !it.directory) return;
+      restored.push({
+        url: it.url,
+        filename: it.file || it.filename || "fichier",
+        mime: it.mime || "text/plain",
+        size: it.size,
+        directory: !!it.directory,
+      });
+    }
+  });
+  composerAttachments = restored;
+  renderComposerAttachments();
   updateSendButtonAvailability();
   updateRevertBanner();
 }
@@ -2740,6 +2760,25 @@ async function loadSessionMessages(sessionId, sessionTitle) {
         input.style.height = input.scrollHeight + "px";
         renderMentionHighlight();
       }
+      // Restaurer les attachments du message reverté.
+      var restoredAttach = [];
+      var bItems = boundaryMsg && Array.isArray(boundaryMsg.items) ? boundaryMsg.items : [];
+      bItems.forEach(function (it) {
+        if (it && (it.kind === "tool") && (String(it.tool || "").toUpperCase() === "FILE" || it.url || it.mime)) {
+          var sp = String(it.source_path || "");
+          var isMentionFile = sp && sp.indexOf("data:") !== 0 && sp.indexOf("http") !== 0;
+          if (isMentionFile && !it.directory) return;
+          restoredAttach.push({
+            url: it.url,
+            filename: it.file || it.filename || "fichier",
+            mime: it.mime || "text/plain",
+            size: it.size,
+            directory: !!it.directory,
+          });
+        }
+      });
+      composerAttachments = restoredAttach;
+      renderComposerAttachments();
       updateSendButtonAvailability();
     } else {
       pendingRevert = null;
@@ -4093,7 +4132,10 @@ function appendChatMessage(role, text, time, metricsOnly, isReasoning, messageId
   // Images jointes via « + » : miniature au-dessus de la bulle utilisateur.
   if (role === "user" && Array.isArray(items)) {
     var imageItems = items.filter(function (it) {
-      return it && isImageAttachment(it);
+      if (!it || !isImageAttachment(it)) return false;
+      var sp = String(it.source_path || "");
+      if (sp && sp.indexOf("data:") !== 0 && sp.indexOf("http") !== 0) return false;
+      return true;
     });
     if (imageItems.length) {
       var imgWrap = document.createElement("div");
@@ -4141,9 +4183,12 @@ function appendChatMessage(role, text, time, metricsOnly, isReasoning, messageId
     // placées en bas de la bulle utilisateur.
     if (Array.isArray(items)) {
       var userAttachItems = items.filter(function (it) {
-        return it && (it.kind === "tool" &&
-          (String(it.tool || "").toUpperCase() === "FILE" || it.url || it.mime)) &&
-          !isImageAttachment(it);
+        if (!(it && (it.kind === "tool") &&
+          (String(it.tool || "").toUpperCase() === "FILE" || it.url || it.mime))) return false;
+        if (isImageAttachment(it)) return false;
+        var sp = String(it.source_path || "");
+        if (sp && sp.indexOf("data:") !== 0 && sp.indexOf("http") !== 0) return false;
+        return true;
       });
       if (userAttachItems.length) {
         var attachWrap = document.createElement("div");
