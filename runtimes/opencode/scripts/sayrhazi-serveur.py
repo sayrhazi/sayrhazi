@@ -871,8 +871,9 @@ def get_chat_history(root: Path, agent_file: str) -> list:
                 messages.append({
                     "role": "system",
                     "text": f"Session {title_s} ouverte (aucun message stocké).",
-                    "time": t,
-                    "session": session_id,
+            "time": t,
+            "created": time_created or time_updated,
+            "session": session_id,
                     "title": title_s,
                     "default_title": _is_default_session_title(title_s),
                     "tokens": "n/d",
@@ -927,8 +928,9 @@ def get_chat_history(root: Path, agent_file: str) -> list:
             messages.append({
                 "role": role,
                 "text": text if text else "(message vide)",
-                "time": t,
-                "session": session_id,
+            "time": t,
+            "created": time_created or time_updated,
+            "session": session_id,
                 "title": title_s,
                 "default_title": _is_default_session_title(title_s),
                 "tokens": tokens,

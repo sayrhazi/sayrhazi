@@ -592,7 +592,29 @@ async function fetchChatSessions(agentFile) {
     }
 
     const fragment = document.createDocumentFragment();
+    var lastDateKey = null;
     messages.forEach(m => {
+      // Regroupement par jour de création (style TUI OpenCode).
+      var created = m.created || m.time_created || m.time_updated || 0;
+      var dateKey = "";
+      var dateLabel = "";
+      if (created) {
+        try {
+          var d = new Date(Number(created));
+          if (!isNaN(d.getTime())) {
+            dateKey = d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
+            var days = ["Dim", "Lun", "Mar", "Mer", "Jeu", "Ven", "Sam"];
+            dateLabel = days[d.getDay()] + " " + d.toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" });
+          }
+        } catch (e) { /* ignore */ }
+      }
+      if (dateKey && dateKey !== lastDateKey) {
+        lastDateKey = dateKey;
+        var dateHeader = document.createElement("div");
+        dateHeader.className = "chat-session-date";
+        dateHeader.textContent = dateLabel;
+        fragment.appendChild(dateHeader);
+      }
       const item = document.createElement("div");
       item.className = "chat-session-item" + (m.session === currentSessionId ? " active" : "") + (m.auto ? " chat-session-auto" : "");
       item.dataset.sessionId = m.session || "";
@@ -1106,7 +1128,7 @@ async function finalizeLiveConversation(sessionId) {
       const duration = m.duration || "";
       if (!model && !duration) return;
       var bits = [];
-      if (model) bits.push(esc(model) + (modelProvider ? ' · ' + esc(modelProvider) : ''));
+      if (model) bits.push(esc(model));
       if (duration) bits.push(esc(duration));
       if (!bits.length) return;
       const foot = '<div class="agent-block-foot">▣ ' + esc(agentLabel) + ' · ' + bits.join(' · ') + '</div>';
@@ -2632,6 +2654,7 @@ async function loadSessionMessages(sessionId, sessionTitle) {
   // info.error du dernier message agent.
   hideAgentErrorBanner();
   const switching = sessionId !== currentSessionId;
+  if (switching && currentSessionId) stashComposerAttachments(currentSessionId);
   remoteMessages = {};
   currentSessionId = sessionId;
   pendingRevert = null;
@@ -2652,6 +2675,7 @@ async function loadSessionMessages(sessionId, sessionTitle) {
       renderMentionHighlight();
       closeAutocomplete();
     }
+    restoreComposerAttachments(sessionId);
     updateSendButtonAvailability();
   }
   // Rouvrir (ou ouvrir) une discussion : on relit en bas (dernier message).
@@ -2840,9 +2864,11 @@ async function startNewSession() {
     if (!response.ok) throw new Error("Erreur HTTP " + response.status);
     const data = await response.json();
     if (data.ok && data.session_id) {
+      stashComposerAttachments(currentSessionId);
       currentSessionId = data.session_id;
       pendingRevert = null;
       composerAttachments = [];
+      composerAttachmentsBySession[currentSessionId] = [];
       renderComposerAttachments();
       const newSessionInput = document.getElementById("chat-message-input");
       if (newSessionInput) { newSessionInput.value = ""; newSessionInput.style.height = ""; }
@@ -3924,7 +3950,7 @@ function renderAgentBlock(role, items, model, duration, seriesEnd, modelProvider
   var foot = [];
   if (seriesEnd) {
     var agentLabel = (selectedChatAgent ? getAgentDisplayName(selectedChatAgent) : "Agent");
-    if (model) foot.push(esc(model) + (modelProvider ? ' · ' + esc(modelProvider) : ''));
+    if (model) foot.push(esc(model));
     if (duration) foot.push(esc(duration));
     if (foot.length) {
       html += '<div class="agent-block-foot">▣ ' + esc(agentLabel) + ' · ' + foot.join(' · ') + '</div>';
@@ -4563,6 +4589,20 @@ function toggleAttachPanel() {
 // avec mime + url + mention.
 // ---------------------------------------------------------------------------
 var composerAttachments = [];
+var composerAttachmentsBySession = {};
+
+function stashComposerAttachments(sid) {
+  if (!sid) return;
+  composerAttachmentsBySession[sid] = (composerAttachments || []).slice();
+}
+
+function restoreComposerAttachments(sid) {
+  composerAttachments = Array.isArray(composerAttachmentsBySession[sid])
+    ? composerAttachmentsBySession[sid].slice()
+    : [];
+  renderComposerAttachments();
+  updateSendButtonAvailability();
+}
 
 function formatFileSize(n) {
   if (!n || n < 0) return "";
@@ -5192,6 +5232,7 @@ function initChatInput() {
       files.forEach(readFileAsDataUrl);
     });
     input.addEventListener("keydown", (e) => {
+      if (handleAutocompleteKeydown(e)) return;
       if (e.key === "Escape" && isAutocompleteOpen()) {
         e.preventDefault();
         closeAutocomplete();
