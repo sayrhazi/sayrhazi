@@ -66,6 +66,8 @@ SCOPE_REQUIRED_ROLES = {
 ROLE_ALIASES: dict[str, str] = {
     "builder-front": "build-front",
     "builder-back": "build-back",
+    "designer": "build-front",
+    "builder": "build-back",
 }
 
 
