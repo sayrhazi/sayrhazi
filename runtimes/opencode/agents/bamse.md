@@ -42,7 +42,7 @@ Vérifie que `project.name` n'est pas `A_COMPLETER`. Inspecte le code existant, 
 
 ## Implémentation
 
-Comprends les critères d'acceptation, implémente la solution minimale et maintenable, puis exécute les commandes pertinentes de configuration. Si la tâche comporte une structure visuelle validée dans `.opencode/resume/design.txt`, suis-la exactement : tu solidifies en implémentant les fonctionnalités, sans re-maquetter. Si la tâche est un scaffolding initial, crée exactement la structure validée dans `plan.txt`, sans ajouter ni omettre de dossier. Place les scripts de preuve dans le projet, jamais dans un dossier temporaire système. Vérifie les régressions et ne supprime aucune fonctionnalité sans accord explicite.
+Comprends les critères d'acceptation, implémente la solution minimale et maintenable, puis exécute les commandes pertinentes de configuration. Si la tâche comporte une structure visuelle validée dans `.opencode/resume/frontend.txt`, suis-la exactement : tu solidifies en implémentant les fonctionnalités, sans re-maquetter. Si la tâche est un scaffolding initial, crée exactement la structure validée dans `plan.txt`, sans ajouter ni omettre de dossier. Place les scripts de preuve dans le projet, jamais dans un dossier temporaire système. Vérifie les régressions et ne supprime aucune fonctionnalité sans accord explicite.
 
 Si la tâche touche l'authentification, les permissions, les données utilisateur, les fichiers, la base de données, les appels externes ou les secrets, indique que l'agent sécurité (voir `agents.security` dans `.opencode/sayrhazi.yaml`) doit auditer la modification.
 

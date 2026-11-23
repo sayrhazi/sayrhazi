@@ -299,8 +299,8 @@ class TestFullstackWatcher(unittest.TestCase):
             p.parent.mkdir(parents=True, exist_ok=True)
             p.write_text(
                 "task_id: F-1\nscope: fullstack\nstatus: EN COURS\n\n"
-                "## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
-                "## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n",
+                "## Étape frontend - Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
+                "## Étape backend - Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n",
                 encoding="utf-8")
             self.assertEqual(w.fullstack_section_status(p, "frontend"), "TERMINÉ")
             self.assertEqual(w.fullstack_section_status(p, "backend"), "EN COURS")
@@ -358,8 +358,8 @@ class TestArchive(unittest.TestCase):
         from archive import archive_fullstack, is_archived, archive_entries
         tmp = self._project(
             "task_id: FEATURE-012\nscope: fullstack\nstatus: TERMINÉ\n\n"
-            "## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
-            "## Étape backend — Bamse\nagent: backend\nstage_status: TERMINÉ\nsummary: API faite.\n")
+            "## Étape frontend - Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n"
+            "## Étape backend - Bamse\nagent: backend\nstage_status: TERMINÉ\nsummary: API faite.\n")
         ok, msg = archive_fullstack(tmp, "FEATURE-012",
                                     controls={"review": "OK", "security": "OK"},
                                     hadji_verdict="OK")
@@ -439,7 +439,7 @@ class TestFullstack(unittest.TestCase):
         from fullstack import read_fullstack
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
-            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
+            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend - Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend - Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
             headers, sections = read_fullstack(p)
             self.assertEqual(headers["task_id"], "FEATURE-012")
             self.assertEqual(headers["scope"], "fullstack")
@@ -453,7 +453,7 @@ class TestFullstack(unittest.TestCase):
         from fullstack import read_fullstack, update_section, validate_fullstack
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
-            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend — Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend — Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
+            p = self._write(tmp, "task_id: FEATURE-012\nscope: fullstack\nstatus: EN COURS\n\n## Étape frontend - Ali\nagent: frontend\nstage_status: TERMINÉ\nsummary: UI faite.\n\n## Étape backend - Bamse\nagent: backend\nstage_status: EN COURS\nsummary: API en cours.\n")
             update_section(p, "backend", ["agent: backend", "stage_status: TERMINÉ", "summary: API faite."])
             headers, sections = read_fullstack(p)
             self.assertIn("stage_status: TERMINÉ", "\n".join(sections["backend"]))

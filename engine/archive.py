@@ -51,8 +51,7 @@ def read_archive(project_root: Path | str) -> str:
 
 def is_archived(project_root: Path | str, task_id: str) -> bool:
     """Verifie si le task_id possede deja une entree complete dans l'archive."""
-    content = read_archive(project_root)
-    return bool(TASK_ID_LINE_RE.search(content))
+    return task_id in archive_entries(project_root)
 
 
 def archive_entries(project_root: Path | str) -> list[str]:

@@ -6,11 +6,11 @@ Lawibrahim discute avec l'utilisateur, explore les options et clarifie les compr
 
 ## Bamse - backend et logique serveur
 
-Bamse inspecte le projet, applique les décisions validées, implémente la tâche et exécute les vérifications pertinentes. Il archive l'ancien `build.txt` (ou sa section de `fullstack.txt`), puis écrit le nouvel état. Il suit la structure visuelle de `design.txt` sans la re-maquetter.
+Bamse inspecte le projet, applique les décisions validées, implémente la tâche et exécute les vérifications pertinentes. Il archive l'ancien `build.txt` (ou sa section de `fullstack.txt`), puis écrit le nouvel état. Il suit la structure visuelle de `frontend.txt` sans la re-maquetter.
 
 ## Ali - interface frontend
 
-Ali pose les briques visuelles à partir de `plan.txt` : maquettes, écrans, composants, responsive, thèmes. Il écrit `design.txt` ou met à jour sa section de `fullstack.txt`. Il crée la structure visuelle neuve, ne modifie ni l'existant ni la logique. Sa méthode : cadrer la cible selon `project.type` (`application` → dashboard, `website` → landing, `api` → portail docs, `library` → docs et playground), chercher 2 à 3 références réelles citées (retenu et rejeté), fonder (palette hex, font-family, tokens) avant de maquetter, sans plagier (systèmes et proportions empruntés, assets jamais copiés, sources créditées).
+Ali pose les briques visuelles à partir de `plan.txt` : maquettes, écrans, composants, responsive, thèmes. Il écrit `frontend.txt` ou met à jour sa section de `fullstack.txt`. Il crée la structure visuelle neuve, ne modifie ni l'existant ni la logique. Sa méthode : cadrer la cible selon `project.type` (`application` → dashboard, `website` → landing, `api` → portail docs, `library` → docs et playground), chercher 2 à 3 références réelles citées (retenu et rejeté), fonder (palette hex, font-family, tokens) avant de maquetter, sans plagier (systèmes et proportions empruntés, assets jamais copiés, sources créditées).
 
 ## Hadji - qualité générale
 
