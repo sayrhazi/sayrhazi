@@ -75,9 +75,23 @@ Les conditions se résolvent depuis `sayrhazi.yaml` (`visual_qa_required` → Za
 
 Les étapes éligibles ensemble partent en parallèle (threads stdlib), bornées par `workflow.max_parallel_agents` (défaut 3, garde-fou machine). La convergence est journalisée (`Convergence : review OK, security OK (2/2)`) : un échec (timeout, erreur) n'empêche jamais les autres branches, qui écrivent chacune leur rapport ; la branche échouée sera réévaluée au prochain changement. `running_agents` reflète l'ensemble en cours. Séquentiel si une seule étape éligible, repli historique sinon.
 
-## Sessions : une par appel, OpenCode responsable
+## Sessions : une par (tâche, agent), rotation sur saturation
 
-Le watcher n'ouvre **jamais** de session partagée. Chaque appel est un `opencode run` sans `--session` : une session neuve, que le watcher ne réutilise pas et ne réinjecte pas. Conséquence : OpenCode garde la main entière sur le contexte (cache, compaction, saturation), le watcher ne fait pas son travail.
+Le watcher réutilise désormais la dernière session connue de l'agent pour la
+tâche (`opencode run --session <id>`) et n'en ouvre une neuve que lorsqu'OpenCode
+indique qu'elle est saturée :
+
+* **Primaire** : `time_compacting` change chez OpenCode entre deux vérifications
+  (compaction détectée, le contexte a été résumé) → nouvelle session ;
+* **Secondaire** : usage ≥ seuil `session.max_usage` de `sayrhazi.yaml`
+  (défaut 85 %) → nouvelle session, avant que la compaction n'intervienne.
+
+L'usage est mesuré exclusivement avec les données d'OpenCode (
+`last_assistant_message`, `message_context_tokens`, `load_model_limits`
+dans `sayrhazi-modules.py`) : `input + output + reasoning + cache.read +
+cache.write`, divisé par la fenêtre de contexte du modèle déclarée dans
+`models.yaml`. Sayrhazi ne recalcule rien, ne déduit aucune limite et ne
+prend jamais de décision sur une valeur estimée.
 
 Chaque appel titre sa session de façon déterministe et unique :
 
@@ -85,15 +99,17 @@ Chaque appel titre sa session de façon déterministe et unique :
 Sayrhazi <task_id> <agent> <run_id>     ex. Sayrhazi FEATURE-007 hadji 20261015-120000-1a2b
 ```
 
-Le `run_id` (horodatage + suffixe) distingue deux appels successifs du même agent sur la même tâche. Le titre est la **seule** chose que le watcher produit pour l'observation ; il ne lit pas la base d'OpenCode, ne calcule aucun pourcentage, ne fixe aucun seuil, ne déclenche ni rotation ni compaction. Le modèle passé à chaque appel (`--model`) reste celui du frontmatter de la fiche agent : changer de modèle impose d'éditer la fiche, jamais un paramètre d'exécution.
+Le `run_id` (horodatage + suffixe) distingue deux appels successifs du même agent sur la même tâche. Le titre est la **seule** chose que le watcher produit pour l'observation. Le modèle passé à chaque appel (`--model`) reste celui du frontmatter de la fiche agent : changer de modèle impose d'éditer la fiche, jamais un paramètre d'exécution.
+
+La décision de rotation n'est jamais prise pendant l'exécution (`opencode run` est synchrone) mais après la fin de l'agent : quand l'usage atteint le seuil ou que `time_compacting` a changé, la prochaine invocation ouvre une nouvelle session et l'état est consigné dans `.opencode/state/watcher-state.yaml` (dernière session connue par agent, usage mesuré, rotation en attente). Quand l'information d'OpenCode est indisponible, Sayrhazi n'estime pas : il signale l'absence de donnée et applique une rotation conservatrice.
 
 La mémoire d'un agent est dans ses rapports (`.opencode/resume/`, archivés dans `history/`), pas dans un historique de conversation réinjecté. Le cloisonnement d'écriture reste exigé à chaque appel : l'agent ne produit QUE son rapport (lire les autres est utile, les écrire est interdit, archivage vers `history/` autorisé).
 
-`state/workflow-state.yaml` ne contient plus de bloc `session:` : l'état ne décrit que la coordination (tâche, statut, étapes, agents en cours). Un état plus ancien peut encore contenir ce bloc ; il est accepté, jamais exigé, jamais réécrit.
+`state/workflow-state.yaml` ne contient pas de bloc `session` : l'état ne décrit que la coordination (tâche, statut, étapes, agents en cours). Les sessions vivent dans `.opencode/state/watcher-state.yaml`. Un état plus ancien peut encore contenir un bloc `session:` ; il est accepté, jamais exigé, jamais réécrit.
 
 ### Pourquoi ce changement
 
-Jusqu'à 0.12.x, le watcher réutilisait `--session` par (tâche, agent) et estimait la saturation avec `tokens_input + tokens_output + tokens_cache_write`, en **excluant `tokens_cache_read`**. Cette exclusion était fausse : la relecture de cache fait partie du contexte renvoyé à chaque appel et en représente souvent la majeure partie. La jauge tombait donc à ~0 % pendant que le panneau Context d'OpenCode affichait la valeur réelle. Retirer tout le mécanisme est plus sûr que de le corriger.
+Jusqu'à 0.12.x, le watcher réutilisait `--session` par (tâche, agent) et estimait la saturation avec `tokens_input + tokens_output + tokens_cache_write`, en **excluant `tokens_cache_read`**. Cette exclusion était fausse : la relecture de cache fait partie du contexte renvoyé à chaque appel et en représente souvent la majeure partie. La jauge tombait donc à ~0 % pendant que le panneau Context d'OpenCode affichait la valeur réelle. Le mécanisme fut supprimé en 0.13.0. La rotation s'appuie désormais exclusivement sur les métriques d'OpenCode, consommées telles quelles.
 
 ## Dashboard web (servi par `sayrhazi-serveur.py`)
 
@@ -128,7 +144,7 @@ La compaction d'OpenCode n'a pas de cas particulier : elle est marquée par un p
 
 Aucun pourcentage cumulatif n'est affiché : additionner des fenêtres de sessions différentes n'a pas de sens.
 
-OpenCode ne stocke nulle part la fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration). Sayrhazi la lit dans `core/runtime/models.yaml`, installé dans `.opencode/models.yaml` et surchargeable par projet. Modèle absent du registre → `n/d` : mieux vaut une métrique absente qu'un pourcentage silencieusement faux ; tokens et coût restent affichés. `tunda sayrhazi` contrôle la présence du registre, de `sayrhazi-modules.py` et nomme la commande d'installation adaptée à la plateforme.
+OpenCode ne stocke nulle part la fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration). Sayrhazi la lit dans `core/runtime/models.yaml`, installé dans `.opencode/models.yaml` et surchargeable par projet. Modèle absent du registre → `n/d` : mieux vaut une métrique absente qu'un pourcentage silencieusement faux ; tokens et coût restent affichés. Au démarrage de `sayrhazi server`, le registre est réécrit depuis `GET /config/providers` : l'en-tête explicatif est préservé, les modèles retirés du catalogue sont supprimés et les modèles `opencode` gratuits sont placés en tête, dans l'ordre affiché par la TUI. `tunda sayrhazi` contrôle la présence du registre, de `sayrhazi-modules.py` et nomme la commande d'installation adaptée à la plateforme.
 
 ### Panneau de détail
 

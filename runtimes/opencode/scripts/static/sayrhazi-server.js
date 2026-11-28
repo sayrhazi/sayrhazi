@@ -9,6 +9,11 @@ let intervalSeconds = 2;
 let selectedAgent = null;
 let selectedChatAgent = null;
 let currentSessionId = null;
+// Sessions dont l'agent est actuellement en train de répondre. Permet de
+// réafficher l'indicateur et le bouton Stop quand on revient sur une
+// discussion dont l'agent travaille encore, et de suivre plusieurs
+// sessions en parallèle (chaque onglet de session garde son état).
+let workingSessions = new Set();
 let pendingRevert = null;
 let rawToolTexts = [];
 let btnDebugJsonEl = null;
@@ -358,13 +363,17 @@ function renderDashboard(data) {
   const tbody = document.getElementById("dashboard-table-body");
   tbody.innerHTML = "";
 
+  const running = data.running || [];
+  const agentRunning = (role) => running.includes(role);
+
   data.agents.forEach(a => {
     const tr = document.createElement("tr");
     tr.dataset.agentFile = a.agent_file;
     tr.style.cursor = "pointer";
     tr.title = "Voir le rapport de l'agent";
+    const dot = agentRunning(a.role) ? '<span class="agent-dot" title="Agent en cours"></span>' : "";
     tr.innerHTML = `
-      <td class="agent">${colorizeReport(a.agent_file)}</td>
+      <td class="agent">${colorizeReport(a.agent_file)}${dot}</td>
       <td class="role">${colorizeReport(a.role)}</td>
       <td>${esc(a.sid)}</td>
       <td>${esc(a.origine)}</td>
@@ -390,8 +399,9 @@ function renderDashboard(data) {
   agentList.innerHTML = "";
   data.agents.forEach(a => {
     const li = document.createElement("li");
+    const dot = agentRunning(a.role) ? '<span class="agent-dot" title="Agent en cours"></span>' : "";
     li.innerHTML = '<a href="#" data-agent="' + esc(a.agent_file) + '">' +
-      esc(getAgentDisplayName(a.agent_file)) + '</a>';
+      esc(getAgentDisplayName(a.agent_file)) + dot + '</a>';
     li.querySelector("a").addEventListener("click", (e) => {
       e.preventDefault();
       selectedAgent = null;
@@ -1365,6 +1375,11 @@ function handleSessionStreamEvent(ev) {
   }
 
   if (ev.kind === "idle" || ev.kind === "done") {
+    // Retirer la session courante de l'ensemble des sessions en cours.
+    if (currentSessionId) {
+      workingSessions.delete(currentSessionId);
+      sessionStreaming[currentSessionId] = false;
+    }
     disconnectSessionStream();
     stopAgentReplyWatch();
     hideAgentWorkingIndicator();
@@ -1372,6 +1387,8 @@ function handleSessionStreamEvent(ev) {
     sessionStreaming[currentSessionId] = false;
     setSendButtonState("send");
     if (currentSessionId) {
+      // Rafraîchir l'indicateur d'usage après la fin de la réponse.
+      refreshUsageRing(currentSessionId);
       // Pas de rechargement global : juste la pose du pied natif
       // (durée de tour) sur les blocs déjà rendus.
       finalizeLiveConversation(currentSessionId);
@@ -2664,7 +2681,13 @@ async function loadSessionMessages(sessionId, sessionTitle) {
   const workingStrip = document.getElementById("chat-agent-working");
   if (workingStrip) {
     const workingSession = workingStrip.dataset ? workingStrip.dataset.session : null;
-    workingStrip.hidden = !workingSession || workingSession !== currentSessionId;
+    // Une session dont l'agent travaille encore montre l'indicateur même
+    // si l'utilisateur vient de changer de discussion et revient.
+    const isWorking = sessionStreaming[sessionId] || workingSessions.has(sessionId) || (workingSession && workingSession === sessionId);
+    workingStrip.hidden = !isWorking;
+    if (isWorking) {
+      workingStrip.dataset.session = sessionId;
+    }
   }
   if (switching) {
     const switchInput = document.getElementById("chat-message-input");
@@ -2682,7 +2705,6 @@ async function loadSessionMessages(sessionId, sessionTitle) {
   chatStickToBottom = true;
   const conv = document.getElementById("chat-conversation");
   if (!conv) return;
-  console.log("[reload] loadSessionMessages déclenché - stack:", new Error("trace").stack);
   try {
     const infoPromise = fetch("/api/chat/session/" + encodeURIComponent(sessionId) + "/info")
       .then(r => (r.ok ? r.json() : null))
@@ -2814,6 +2836,8 @@ async function loadSessionMessages(sessionId, sessionTitle) {
     updateRevertBanner();
     updateChatHeaderTitle();
     refreshPendingQuiet();
+    // Indicateur circulaire d'usage du contexte.
+    refreshUsageRing(sessionId);
     // Si l'agent répond encore (dernier message assistant sans `completed`), on
     // rétablit l'indicateur et le bouton ■. L'événement session.idle stoppera
     // tout automatiquement.
@@ -2823,7 +2847,16 @@ async function loadSessionMessages(sessionId, sessionTitle) {
       }
       return null;
     })();
-    if (latestAgent && !latestAgent.completed) {
+    // Si le dernier message agent est terminé (completed truthy), l'agent a
+    // fini — même si workingSessions le contenait encore (idle manqué pendant
+    // l'absence). On nettoie et on n'affiche pas l'indicateur.
+    const agentHasCompleted = !!(latestAgent && latestAgent.completed);
+    if (agentHasCompleted) {
+      workingSessions.delete(sessionId);
+      sessionStreaming[sessionId] = false;
+    }
+    const sessionIsWorking = !agentHasCompleted && (sessionStreaming[sessionId] || workingSessions.has(sessionId) || (latestAgent && !latestAgent.completed));
+    if (sessionIsWorking) {
       setSendButtonState("stop");
       // Au rechargement : l'agent travaille encore - le bouton stop
       // accompagne depuis l'arrivée SSE.
@@ -2833,6 +2866,15 @@ async function loadSessionMessages(sessionId, sessionTitle) {
       // bouton grisé jusqu'à réception d'événements agent réels.
       var chatBtn = document.getElementById("chat-send-btn");
       if (chatBtn) chatBtn.disabled = true;
+    } else {
+      setSendButtonState("send");
+      hideAgentWorkingIndicator();
+      if (sessionStreaming[sessionId]) {
+        delete sessionStreaming[sessionId];
+      }
+      if (workingSessions.has(sessionId)) {
+        workingSessions.delete(sessionId);
+      }
     }
     // Foot Interrompu sur le dernier bloc agent si session aborted
     injectInterruptionFooter(sessionId);
@@ -3063,7 +3105,13 @@ async function sendChatMessage() {
     const data = await response.json().catch(() => ({ ok: false, message: "Réponse invalide" }));
 
     if (response.ok && data.ok) {
-      setSendButtonState("send");
+      // Marquer la session comme « agent en cours » pour que le retour sur
+      // cette discussion affiche l'indicateur et le bouton Stop.
+      if (currentSessionId) {
+        workingSessions.add(currentSessionId);
+        sessionStreaming[currentSessionId] = true;
+      }
+      setSendButtonState("stop");
       if (btn) btn.disabled = true;
       // Un envoi avec un revert en attente valide définitivement le revert
       // (cleanup côté OpenCode dans prompt_async) : la GUI supprime alors
@@ -3075,6 +3123,8 @@ async function sendChatMessage() {
       // l'agent répond. Le rechargement complet se fait à l'arrivée de
       // l'événement session.idle (pied natif + alignement).
       connectSessionStream(currentSessionId);
+      // Rafraîchir l'indicateur d'usage après l'envoi.
+      refreshUsageRing(currentSessionId);
     } else {
       setSendButtonState("send");
       var attachCode = data && data.code ? String(data.code) : "";
@@ -3874,7 +3924,7 @@ function renderToolBlock(t) {
       headerHtml +
       '</div>' +
       '<div class="tool-error-content" style="display:none;">' +
-      '<div style="white-space:pre-wrap; font-family:Fira Code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#ef4444; padding:0.6rem; background:#1a1a1a; border:1px solid #333; border-radius:0.35rem; margin-top:0.4rem;">' + esc(errorMsg) + '</div>' +
+      '<div style="white-space:pre-wrap; font-family:Fira Code,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; color:#ef4444; padding:0.6rem; background:#1a1a1a; border:1px solid #333; border-radius:0.35rem; margin-top:0.4rem; font-size:12px;">' + esc(errorMsg) + '</div>' +
       '</div>';
   }
 
@@ -4152,7 +4202,10 @@ function appendChatMessage(role, text, time, metricsOnly, isReasoning, messageId
     return;
   }
 
-  div.className = "chat-message " + role + (metricsOnly ? " metrics-only" : "");
+  // Marquer les bulles user lancees par watch-work (prompts contenant
+  // "Sayrhazi task ") pour les distinguer des messages saisis a la main.
+  var isWatchWorkUser = (role === "user" && text && String(text).indexOf("Sayrhazi task ") !== -1);
+  div.className = "chat-message " + role + (metricsOnly ? " metrics-only" : "") + (isWatchWorkUser ? " watch-work" : "");
   if (messageId) div.dataset.messageId = messageId;
 
   // Images jointes via « + » : miniature au-dessus de la bulle utilisateur.
@@ -5401,7 +5454,7 @@ function renderChatMarkdown(text, role) {
   let cleaned = cleanOpenCodeFileBlock(text || "");
   // Le parsing Markdown consomme les backslashes d'echappement (\. devient .) :
   // on les double pour afficher le texte brut, comme dans la TUI
-  // (ex: "PS C:\Users\...\Sarhi\.opencode>").
+  // (ex: "PS C:\Users\...\mon-projet\.opencode>").
   cleaned = cleaned.replace(/\\/g, "\\\\");
   let markedText = colorizeKeywords(cleaned);
   let html = marked.parse(markedText || "", { breaks: true });
@@ -5795,4 +5848,39 @@ function cancelQuestion() {
     pendingQuestion = null;
     renderQuestionBanner();
   });
+}
+
+// === Indicateur circulaire d'usage du contexte (à côté du bouton Envoyer) ===
+function updateUsageRing(pct, tokens, limit) {
+  const ring = document.getElementById("chat-usage-ring");
+  const text = document.getElementById("chat-usage-ring-text");
+  const fg = ring ? ring.querySelector(".chat-usage-ring-fg") : null;
+  if (!ring || !text || !fg) return;
+  if (typeof pct !== "number" || !Number.isFinite(pct)) {
+    fg.style.strokeDasharray = "0 100";
+    text.textContent = "—";
+    ring.classList.remove("has-usage");
+    ring.title = "Usage du contexte : inconnu";
+    return;
+  }
+  const clamped = Math.max(0, Math.min(100, pct));
+  fg.style.strokeDasharray = clamped + " 100";
+  text.textContent = Math.round(clamped) + "%";
+  ring.classList.add("has-usage");
+  ring.title = "Usage du contexte : " + Math.round(clamped) + " %" +
+    (tokens ? " (" + tokens.toLocaleString("fr-FR") + " tok" + (limit ? " / " + limit.toLocaleString("fr-FR") : "") + ")" : "");
+}
+
+async function refreshUsageRing(sessionId) {
+  if (!sessionId) { updateUsageRing(null); return; }
+  try {
+    const resp = await fetch("/api/chat/session/" + encodeURIComponent(sessionId) + "/info");
+    if (!resp.ok) return;
+    const data = await resp.json().catch(function () { return {}; });
+    if (data && data.ok) {
+      updateUsageRing(data.usage_pct, data.usage_tokens, data.usage_limit);
+    }
+  } catch (err) {
+    // Silencieux : l'indicateur reste sur sa dernière valeur.
+  }
 }

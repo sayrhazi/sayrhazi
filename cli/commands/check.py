@@ -247,7 +247,7 @@ def main() -> int:
     if HAS_REPORT_CHECK:
         checked = 0
         bad = 0
-        for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt",
+        for name in ("plan.txt", "review.txt", "security.txt", "qa.txt",
                      "frontend.txt", "backend.txt"):
             p = opencode / "resume" / name
             if not p.is_file():

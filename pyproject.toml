@@ -1,6 +1,6 @@
 [project]
 name = "sayrhazi"
-version = "0.16.0"
+version = "0.17.0"
 description = "Workflow multi-agents portable"
 readme = "README.md"
 requires-python = ">=3.10"

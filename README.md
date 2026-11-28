@@ -10,7 +10,7 @@
 ║    \___ \ / _` | | | | '__| '_ \ / _` |_  / | |   ║
 ║     ___) | (_| | |_| | |  | | | | (_| |/ /__| |   ║
 ║    |____/ \__,_|\__, |_|  |_| |_|\__,_/_____|_|   ║
-║                 |___/  v0.16.0 - sayrhazi          ║
+║                 |___/  v0.17.0 - sayrhazi         ║
 ║                                                   ║
 ╚═══════════════════════════════════════════════════╝
 ```
@@ -84,7 +84,6 @@ Chaque rapport contient : date système réelle, projet, tâche (`task_id:` stab
 
 Avant de remplacer son fichier `resume/`, chaque agent archive l'ancien contenu ici : `build-log.md`, `design-log.md`, `review-log.md`, `security-log.md`, `qa-log.md`, `frontend-log.md`, `backend-log.md`. `plan.txt` reste cumulatif jusqu'à l'archivage explicite d'une feature dans `.opencode/features/<nom>.md`. L'artefact `fullstack.txt` est archivé dans `history/fullstack-log.md` (une entrée cumulative par `task_id`, après OK global uniquement).
 
-> Les fichiers `design.txt` et `build.txt` sont conservés pour la rétrocompatibilité des projets installés avant la v0.14.0 (via les aliases `ROLE_ALIASES`), mais ne figurent plus dans le tableau des rapports standards par défaut (`frontend.txt`/`backend.txt`).
 
 ## Comment ça se déroule concrètement
 
@@ -111,7 +110,7 @@ Sayrhazi/      # noyau : core, runtimes/opencode, engine, cli, tests, docs
 MonProjet/     # projet : code + .opencode/ + AGENTS.md
 ```
 
-Chaque projet possède sa propre copie de `.opencode/agent/` (`sayrhazi.yaml`, `workflow.yaml`, `opencode.json`, `watch-work.py`, `resume/`, `history/`, `features/`, `state/` local à ignorer par git). `.opencode/workflow.yaml` décrit le parcours déclaratif (étapes, déclencheurs, conditions) ; seule la transition `build → Hadji` est automatique, le reste est orchestré par l'humain. Les rapports et historiques ne sont jamais partagés entre projets. Les agents ne supposent jamais le nom du projet : ils lisent `.opencode/sayrhazi.yaml`.
+Chaque projet possède sa propre copie de `.opencode/agent/` (`sayrhazi.yaml`, `workflow.yaml`, `opencode.json`, `watch-work.py`, `resume/`, `history/`, `features/`, `state/` local à ignorer par git). `.opencode/workflow.yaml` décrit le parcours déclaratif (étapes `buildback`, `buildfront`, `review`, `security`, `visual_qa`, `rework`, `rework_qa` ; déclencheurs et conditions) : la construction reste orchestrée par l'humain, les transitions de review, sécurité, QA et reprise sont automatiques. Les rapports et historiques ne sont jamais partagés entre projets. Les agents ne supposent jamais le nom du projet : ils lisent `.opencode/sayrhazi.yaml`.
 
 Par défaut, `opencode.json` demande `question` et `external_directory` en mode `ask` (modals natives d'OpenCode) ; `sayrhazi update` ajoute ces clés si elles sont absentes (sans écraser les vôtres) et crée `opencode.json` selon le template du noyau.
 
@@ -131,7 +130,7 @@ sayrhazi .
 
 L'installation globale place le binaire `sayrhazi` (ou `sayrhazi.cmd` sous Windows) dans le `PATH` de npm. Aucun script de profil n'est à sourcer : les commandes `sayrhazi info`, `sayrhazi check`, `sayrhazi tunda`, `sayrhazi update`, `sayrhazi remove` et `sayrhazi --version` fonctionnent immédiatement.
 
-Sans npm, depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.git`) :
+Sans npm, depuis un clone du dépôt (`https://github.com/lawibrahim/sayrhazi.git`) :
 
 ```powershell
 & "<clone>\runtimes\opencode\scripts\Install-Sayrhazi.ps1" -ProjectPath "."

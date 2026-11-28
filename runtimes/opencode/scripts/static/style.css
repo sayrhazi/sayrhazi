@@ -74,6 +74,18 @@ a:hover {
   color: var(--text);
 }
 
+/* Point vert : agent en cours (running_agents du watcher) */
+.agent-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  background: var(--success);
+  border-radius: 50%;
+  float: right;
+  margin-top: 0.08rem;
+  box-shadow: 0 0 0 1.5px #0f172a;
+  flex-shrink: 0;
+}
+
 .sidebar-nav h3 {
   font-size: 0.75rem;
   text-transform: uppercase;
@@ -532,6 +544,12 @@ td.etat {
   color: var(--text);
   border-bottom-right-radius: 0.15rem;
   border: 1px solid #334155;
+}
+
+/* Bulle user lancee par le watcher (appel d'agent) : bordure d'accent pour la
+   distinguer des messages saisis a la main dans une conversation. */
+.chat-message.user.watch-work .chat-bubble {
+  border: 1px solid var(--accent);
 }
 
 .chat-message.agent .chat-bubble {
@@ -3264,4 +3282,51 @@ td.etat {
   margin: 0.6rem 0 0.25rem; 
   padding-left: 0.2rem; 
   background: var(--panel);
+}
+
+/* === Indicateur circulaire d'usage du contexte (à côté du bouton Envoyer) === */
+.chat-usage-ring {
+  position: relative;
+  width: 2.3rem;
+  height: 2.3rem;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-usage-ring-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.chat-usage-ring-bg {
+  fill: none;
+  stroke: #334155;
+  stroke-width: 3;
+}
+
+.chat-usage-ring-fg {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0 100;
+  transition: stroke-dasharray 0.4s ease;
+}
+
+.chat-usage-ring-text {
+  position: relative;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
+.chat-usage-ring.has-usage .chat-usage-ring-text {
+  color: var(--accent);
 }

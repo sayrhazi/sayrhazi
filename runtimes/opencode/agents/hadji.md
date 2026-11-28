@@ -14,7 +14,7 @@ Rédige toujours tes réponses et rapports en français, sauf demande contraire 
 ## Contexte projet en cours
 
 Lis `.opencode/sayrhazi.yaml`, `AGENTS.md` et le rapport de l'étape implémentation :
-- scope `backend` ou classique : `.opencode/resume/build.txt` (agent `build-back`) ;
+- scope `backend` ou classique : `.opencode/resume/backend.txt` (agent `build-back`) ;
 - scope `frontend` : `.opencode/resume/frontend.txt` (agent `frontend`) ;
 - scope `fullstack` : `.opencode/resume/fullstack.txt` (sections frontend d'Ali et backend de Bamse, toutes deux doivent être `TERMINÉ`).
 

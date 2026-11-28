@@ -6,7 +6,7 @@ Lawibrahim discute avec l'utilisateur, explore les options et clarifie les compr
 
 ## Bamse - backend et logique serveur
 
-Bamse inspecte le projet, applique les décisions validées, implémente la tâche et exécute les vérifications pertinentes. Il archive l'ancien `build.txt` (ou sa section de `fullstack.txt`), puis écrit le nouvel état. Il suit la structure visuelle de `frontend.txt` sans la re-maquetter.
+Bamse inspecte le projet, applique les décisions validées, implémente la tâche et exécute les vérifications pertinentes. Il archive l'ancien `backend.txt` (ou sa section de `fullstack.txt`), puis écrit le nouvel état. Il suit la structure visuelle de `frontend.txt` sans la re-maquetter.
 
 ## Ali - interface frontend
 
@@ -52,7 +52,7 @@ Chaque agent peut donc porter un modèle différent - un modèle payant pour une
 
 Le modèle doit exister dans la base d'OpenCode. Sa fenêtre de contexte se déclare dans `core/runtime/models.yaml` (installé dans `.opencode/models.yaml`) : sans cette entrée, le dashboard affiche `n/d` sur le contexte du dernier message, tout en affichant tokens et coût.
 
-Ce registre est un **relevé ponctuel**, pas un catalogue officiel : les modèles listés étaient accessibles à la date indiquée (`verified_at`) et un fournisseur peut les retirer ou les rendre payants à tout moment (constaté : des modèles apparaissent et disparaissent d'une semaine à l'autre). Une présence dans ce fichier ne signifie donc **jamais** qu'un modèle est gratuit.
+Ce registre est un **relevé ponctuel**, pas un catalogue officiel : les modèles listés étaient accessibles à la date indiquée (`verified_at`) et un fournisseur peut les retirer ou les rendre payants à tout moment (constaté : des modèles apparaissent et disparaissent d'une semaine à l'autre). Une présence dans ce fichier ne signifie donc **jamais** qu'un modèle est gratuit. Le serveur l'aligne sur le catalogue OpenCode actuel au démarrage : seuls les modèles encore proposés restent inscrits, avec les modèles `opencode` gratuits en tête.
 
 ## Identité visuelle
 

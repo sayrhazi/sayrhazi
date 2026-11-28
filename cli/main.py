@@ -2,14 +2,14 @@
 """CLI Sayrhazi - point d'entree multi-plateforme (stdlib uniquement).
 
 Usage :
-    python cli/main.py [--version] | [install] [--project .]
-    python cli/main.py check [sayrhazi] [--project .]
-    python cli/main.py update [--project .]
-    python cli/main.py remove [--project .] [--yes]
-    python cli/main.py info [--project .]
+    python cli/main.py [--version] | [install] [chemin] [--project .]
+    python cli/main.py check [chemin] [--project .]
+    python cli/main.py update [chemin] [--project .]
+    python cli/main.py remove [chemin] [--project .] [--yes]
+    python cli/main.py info [chemin] [--project .]
     python cli/main.py server [--port PORT] [--root CHEMIN]
 
-Sans commande : installe dans --project.
+Sans commande ou avec un chemin seul : installe dans ce chemin puis contrôle.
 """
 from __future__ import annotations
 
@@ -52,11 +52,18 @@ def _run_subprocess(cmd: list[str]) -> int:
         return 130
 
 
+def _is_project_path(token: str) -> bool:
+    if token in (".", "..") or token.startswith("~") or "/" in token or "\\" in token:
+        return True
+    return Path(token).is_dir()
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="CLI Sayrhazi")
     parser.add_argument("--version", action="store_true", help="affiche la version")
-    parser.add_argument("command", choices=COMMANDS, nargs="?")
-    parser.add_argument("--project", default=".", help="racine du projet (defaut: .)")
+    parser.add_argument("command", nargs="?", help="commande ou chemin du projet")
+    parser.add_argument("path", nargs="?", help="chemin du projet")
+    parser.add_argument("--project", default=None, help="racine du projet (defaut: .)")
     parser.add_argument("--yes", action="store_true", help="remove : supprimer vraiment (defaut : simulation)")
     parser.add_argument("--port", type=int, default=None, help="server : port d'ecoute")
     parser.add_argument("--root", type=str, default=None, help="server : racine du projet")
@@ -65,26 +72,37 @@ def main() -> int:
     if args.version:
         print(_version())
         return 0
-    bare = not args.command
+
+    bare = args.command is None or (
+        args.command not in COMMANDS and _is_project_path(args.command))
     if bare:
-        args.command = "install"
+        if args.path is not None:
+            parser.error("trop d'arguments pour l'installation")
+        command = "install"
+        project = args.command or args.project or "."
+    else:
+        if args.command not in COMMANDS:
+            parser.error("commande inconnue : " + args.command)
+        command = args.command
+        project = args.path or args.project or "."
 
     here = Path(__file__).resolve().parent
-    target = here / "commands" / (args.command + ".py")
+    target = here / "commands" / (command + ".py")
     cmd = [sys.executable, str(target)]
-    if args.command == "server":
+    if command == "server":
         if args.port is not None:
             cmd += ["--port", str(args.port)]
-        if args.root is not None:
-            cmd += ["--root", args.root]
+        root = args.path or args.root or args.project
+        if root is not None:
+            cmd += ["--root", root]
     else:
-        cmd += ["--project", args.project]
-        if args.command == "remove" and args.yes:
+        cmd += ["--project", project]
+        if command == "remove" and args.yes:
             cmd += ["--yes"]
     code = _run_subprocess(cmd)
     if bare and code == 0:
         check = [sys.executable, str(here / "commands" / "check.py"),
-                 "--project", args.project]
+                 "--project", project]
         code = _run_subprocess(check)
     return code
 

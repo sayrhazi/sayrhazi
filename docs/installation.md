@@ -18,7 +18,7 @@ Puis, depuis le projet cible :
 sayrhazi .
 ```
 
-Depuis un clone du dépôt (`https://github.com/Lawi-Salim/sayrhazi.git`), le script retrouve sa source tout seul :
+Depuis un clone du dépôt (`https://github.com/lawibrahim/sayrhazi.git`), le script retrouve sa source tout seul :
 
 ```powershell
 & "<clone>\runtimes\opencode\scripts\Install-Sayrhazi.ps1" -ProjectPath "."

@@ -189,7 +189,14 @@
             <div class="chat-composer-bar">
               <button id="chat-attach-btn" title="Joindre" aria-label="Joindre">+</button>
               <button class="chat-composer-model" id="chat-composer-model" type="button" title="Modèle et fournisseur de l'agent - cliquer pour changer" aria-haspopup="dialog"></button>
-              <button id="chat-send-btn" title="Envoyer" aria-label="Envoyer" disabled>↑</button>
+              <div class="chat-usage-ring" id="chat-usage-ring" title="Usage du contexte" aria-label="Usage du contexte">
+              <svg viewBox="0 0 36 36" class="chat-usage-ring-svg">
+                <circle class="chat-usage-ring-bg" cx="18" cy="18" r="15.915" />
+                <circle class="chat-usage-ring-fg" cx="18" cy="18" r="15.915" />
+              </svg>
+              <span class="chat-usage-ring-text" id="chat-usage-ring-text">—</span>
+            </div>
+            <button id="chat-send-btn" title="Envoyer" aria-label="Envoyer" disabled>↑</button>
             </div>
           </div>
           <div id="chat-attach-panel" class="chat-attach-panel" style="display:none;">

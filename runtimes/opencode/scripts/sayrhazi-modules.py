@@ -136,20 +136,22 @@ def tail_lines(path: Path, count: int) -> list:
 
 
 def tail_lines_today(path: Path) -> list:
+    """Lignes du journal de la dernière journée (format `- [AAAA-MM-JJ ...]`)."""
     try:
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
     except OSError:
         return []
     dates_seen = set()
     for line in lines:
-        if line.strip() and len(line) >= 10:
-            date_part = line[:10]
-            if date_part[:4].isdigit() and date_part[4] == "-" and date_part[7] == "-":
-                dates_seen.add(date_part)
+        m = re.search(r"\d{4}-\d{2}-\d{2}", line[:30])
+        if m:
+            dates_seen.add(m.group(0))
     if not dates_seen:
         return []
     last_day = sorted(dates_seen)[-1]
-    return [line for line in lines if line.startswith(last_day)]
+    return [line for line in lines
+            if (m := re.search(r"\d{4}-\d{2}-\d{2}", line[:30])) is not None
+            and m.group(0) == last_day]
 
 
 def lock_info(project_root: Path):
@@ -236,6 +238,25 @@ def load_model_limits(project_root: Path) -> dict:
                     limits[current] = value
                 current = None
     return limits
+
+
+def session_time_compacting(db_path, session_id: str):
+    """Valeur de `session.time_compacting` (marqueur de compaction OpenCode) ou None.
+
+    Lecture seule de la base OpenCode : Sayrhazi n'en écrit jamais et ne
+    déduit rien d'autre.
+    """
+    try:
+        import sqlite3
+        db = sqlite3.connect("file:" + str(db_path) + "?mode=ro", uri=True, timeout=5)
+        try:
+            row = db.execute("SELECT time_compacting FROM session WHERE id = ?",
+                             (session_id,)).fetchone()
+        finally:
+            db.close()
+        return row[0] if row else None
+    except Exception:
+        return None
 
 
 def find_sessions(db_path, directory: str, agent_file: str, prefix: str) -> list:
@@ -486,7 +507,6 @@ def build_dashboard_data(project_root: Path) -> dict:
                 # elles ne portent pas le préfixe watcher.
                 sessions = find_sessions(db_path, str(project_root), agent_file, "")
             if sessions:
-                usage_pct = "0 %"  # session sans tokens mesurés : 0 % par défaut
                 auto = latest_auto_session(sessions)
                 manuel = latest_manual_session(sessions)
                 calls = sum(1 for s in sessions if s.get("auto"))
@@ -501,11 +521,12 @@ def build_dashboard_data(project_root: Path) -> dict:
                 payload = last_assistant_message(db_path, str(courante["id"]))
                 if payload:
                     ctx = message_context_tokens(payload)
+                    if ctx > 0:
+                        tokens = f"{ctx:,}".replace(",", " ")
                     limit = (limits or {}).get(message_model_key(payload))
                     if isinstance(limit, int) and limit > 0:
                         pct = ctx / limit
                         usage_pct = f"{pct * 100:.0f} %"
-                        tokens = f"{ctx:,}".replace(",", " ")
                     cost = courante.get("cost")
                     if cost is not None:
                         cout_sess = f"${float(cost):.2f}"
@@ -546,6 +567,7 @@ def build_dashboard_data(project_root: Path) -> dict:
         "archived": sorted(archived),
         "root": str(project_root),
         "agents": agents,
+        "running": running,
         "now": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     }
 

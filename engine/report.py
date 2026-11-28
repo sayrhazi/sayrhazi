@@ -24,9 +24,9 @@ TASK_STATUSES = ("À IMPLÉMENTER", "INFORMATIF", "EN COURS", "TERMINÉ", "BLOQU
 ROLE_STATUSES: dict[str, tuple[str, ...]] = {
     # plan.txt (Lawibrahim)
     "architect": ("À IMPLÉMENTER", "INFORMATIF", "VALIDÉ"),
-    # design.txt (Ali)
+    # frontend.txt (Ali)
     "build-front": ("PROPOSÉ", "VALIDÉ"),
-    # build.txt (Bamse)
+    # backend.txt (Bamse)
     "build-back": ("EN COURS", "TERMINÉ", "BLOQUÉ"),
     # review.txt (Hadji), security.txt (Hifadhui)
     "reviewer": ("VALIDÉ", "VALIDÉ AVEC RÉSERVES", "CORRECTIONS NÉCESSAIRES"),

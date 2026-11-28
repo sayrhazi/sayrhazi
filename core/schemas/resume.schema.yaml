@@ -2,8 +2,8 @@
 resume:
   fields:
     plan.txt: {cumulatif: true, archive_vers: features}
-    design.txt: {verdicts: [PROPOSÉ, VALIDÉ]}
-    build.txt: {verdicts: [EN COURS, TERMINÉ, BLOQUÉ]}
+    frontend.txt: {verdicts: [PROPOSÉ, VALIDÉ]}
+    backend.txt: {verdicts: [EN COURS, TERMINÉ, BLOQUÉ]}
     review.txt: {verdicts: [VALIDÉ, VALIDÉ AVEC RÉSERVES, CORRECTIONS NÉCESSAIRES]}
     security.txt: {verdicts: [VALIDÉ, VALIDÉ AVEC RÉSERVES, CORRECTIONS NÉCESSAIRES]}
     qa.txt: {verdicts: [VALIDÉ, VALIDÉ AVEC RÉSERVES, CORRECTIONS NÉCESSAIRES, À COMPLÉTER]}
