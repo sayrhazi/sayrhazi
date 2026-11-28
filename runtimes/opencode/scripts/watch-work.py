@@ -7,7 +7,7 @@ et son statut sont autorisés, la condition de l'étape est satisfaite, et le
 rapport de sortie ne couvre pas déjà ce `task_id`. Les étapes éligibles
 ensemble partent en parallèle (Lot 6, bornées par `max_parallel_agents`),
 avec convergence journalisée ; sans config valide, repli sur la transition
-historique : `build.txt TERMINÉ -> Hadji`.
+historique : `backend.txt TERMINÉ -> Hadji`.
 
 Garde-fous : verrou d'instance unique, anti-double en mémoire + sortie
 existante (survit au redémarrage, point 7 du contrat), minuteur visible,
@@ -29,6 +29,7 @@ Usage :
 import argparse
 import concurrent.futures
 import hashlib
+import importlib
 import json
 import os
 import re
@@ -82,7 +83,7 @@ AGENT_PROMPTS = {
 OWN_REPORT = {"build-back": "backend.txt", "reviewer": "review.txt", "security": "security.txt",
               "qa": "qa.txt", "build-front": "frontend.txt",
               "frontend": "fullstack.txt", "backend": "fullstack.txt"}
-ALL_REPORTS = ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt", "fullstack.txt")
+ALL_REPORTS = ("plan.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt", "fullstack.txt")
 
 
 def isolation_clause(agent: str) -> str:
@@ -102,26 +103,34 @@ def log(message: str) -> None:
     print(f"{stamp} {style_line(message)}", flush=True)
 
 
-# --- Sessions OpenCode : une session neuve par appel, titres traçables ---
+# --- Sessions OpenCode : une session par (tâche, agent), rotation sur saturation ---
 #
-# Le watcher ne fait plus le travail d'OpenCode : il ne lit pas sa base, ne
-# calcule aucun usage, ne fixe aucun seuil et ne déclenche ni rotation ni
-# compaction. Chaque appel ouvre une session neuve (`opencode run` sans
-# `--session`) et la titre de façon déterministe et unique :
+# Le watcher ne fait pas le travail d'OpenCode : il ne calcule pas les tokens,
+# ne déduit pas la fenêtre ni le pourcentage d'usage. Il consulte les données
+# exposées par OpenCode (via sayrhazi-modules.py :
+# last_assistant_message, message_context_tokens, load_model_limits) et
+# applique sa propre politique de rotation : nouvelle session quand l'usage
+# atteint le seuil `session.max_usage` de sayrhazi.yaml (défaut 85 %) ou quand
+# `time_compacting` change chez OpenCode (compaction). La décision est prise
+# après la fin de l'agent, jamais pendant son exécution (`opencode run` est
+# synchrone).
+#
+# Chaque appel ouvre une session neuve (`opencode run` sans `--session`) ou
+# réutilise la dernière session connue de l'agent pour la tâche (`--session`),
+# décidée ci-dessus. La session est titrée de façon déterministe et unique :
 #
 #     Sayrhazi <task_id> <agent> <run_id>
 #
-# Le titre est la seule chose que le watcher produit pour l'observation ; le
-# dashboard (sayrhazi-modules.py) retrouve ensuite chaque session par ce préfixe et
-# y lit les métriques qu'OpenCode a lui-même enregistrées (tokens du dernier
-# message assistant, coût de session). La mémoire d'un agent reste dans les
-# rapports (`.opencode/resume/`), pas dans un historique réinjecté.
+# La mémoire d'un agent reste dans les rapports (`.opencode/resume/`), pas dans
+# un historique de conversation réinjecté. L'état des sessions est conservé
+# dans `.opencode/state/watcher-state.yaml` (dernière session connue par agent,
+# usage mesuré, rotation en attente).
 #
 # Historique : jusqu'à 0.12.x le watcher réutilisait `--session` par
 # (tâche, agent) et estimait la saturation avec des compteurs cumulés en
-# excluant `tokens_cache_read`. Or cette valeur est précisément la majeure
-# partie du contexte renvoyé à chaque appel : la jauge tombait à ~0 % pendant
-# que le panneau Context d'OpenCode affichait la valeur réelle. Supprimé.
+# excluant `tokens_cache_read`. Cette exclusion était fausse (la relecture de
+# cache fait partie du contexte) : le mécanisme fut supprimé en 0.13.0. La
+# rotation s'appuie désormais exclusivement sur les métriques d'OpenCode.
 
 RUN_ID_RE = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{4}$")
 
@@ -157,6 +166,31 @@ def build_run_id(start: Optional[float] = None) -> str:
 def session_title(task_id: str, agent_file: str, run_id: str) -> str:
     """Titre de session : préfixe stable + identifiant d'appel."""
     return f"Sayrhazi {task_id} {agent_file} {run_id}"
+
+
+# --- Briques partagées : lecture OpenCode (même répertoire que watch-work.py) ---
+_here = Path(__file__).resolve().parent
+if str(_here) not in sys.path:
+    sys.path.insert(0, str(_here))
+try:
+    _mod = importlib.import_module("sayrhazi-modules")
+    opencode_db_path = _mod.opencode_db_path
+    find_sessions = _mod.find_sessions
+    latest_auto_session = _mod.latest_auto_session
+    last_assistant_message = _mod.last_assistant_message
+    message_context_tokens = _mod.message_context_tokens
+    message_model_key = _mod.message_model_key
+    load_model_limits = _mod.load_model_limits
+    session_time_compacting = _mod.session_time_compacting
+except Exception:  # sayrhazi-modules est toujours présent à l'installation
+    opencode_db_path = None
+    find_sessions = None
+    latest_auto_session = None
+    last_assistant_message = None
+    message_context_tokens = None
+    message_model_key = None
+    load_model_limits = None
+    session_time_compacting = None
 
 
 ANSI_COLORS = {"reset": "\x1b[0m", "cyan": "\x1b[36m", "yellow": "\x1b[33m",
@@ -291,8 +325,8 @@ def file_hash(path: Path) -> Optional[str]:
         return None
 
 
-def parse_build_report(path: Path) -> Tuple[Optional[str], Optional[str]]:
-    """Extrait (task_id, status) depuis build.txt. Retourne (None, None) si absent."""
+def parse_backend_report(path: Path) -> Tuple[Optional[str], Optional[str]]:
+    """Extrait (task_id, status) depuis backend.txt. Retourne (None, None) si absent."""
     try:
         text = path.read_text(encoding="utf-8", errors="replace").lstrip(chr(0xFEFF))
     except FileNotFoundError:
@@ -570,7 +604,30 @@ def select_auto_stages(config: Optional[dict]) -> Tuple[list, list]:
             notes.append(f"{where} ignorée (trigger.status absent)")
             continue
         usable.append(stage)
+    _reroute_without_backend(usable)
     return usable, notes
+
+
+def _reroute_without_backend(usable: list) -> None:
+    """Chaîne naturelle sans Bamse : les étapes déclenchées sur `backend.txt`
+    deviennent déclenchées sur `frontend.txt` quand la chaîne automatique
+    comprend Ali (`build-front`, `auto: true`).
+
+    Soit : Lawibrahim → plan.txt, Ali → frontend.txt, « les autres agents »
+    suite — le watcher suit alors cette automation au lieu d'attendre un
+    rapport de Bamse qui n'existe pas dans ce projet. Le statut du déclencheur
+    devient celui que Ali écrit (`VALIDÉ` pour le rapport build-front).
+    """
+    front_report = ROLE_REPORT.get("build-front") or "frontend.txt"
+    front_status = (ROLE_STATUS_OK.get("build-front") or ("VALIDÉ",))[0]
+    if not any(isinstance(s, dict) and s.get("agent") == "build-front"
+               and s.get("auto") for s in usable):
+        return
+    for stage in usable:
+        trig = stage.get("trigger")
+        if isinstance(trig, dict) and trig.get("report") == "backend.txt":
+            trig["report"] = front_report
+            trig["status"] = front_status
 
 
 def lock_path(project_root: Path) -> Path:
@@ -863,6 +920,7 @@ def note_state_running(project_root: Path, task_id: str, agent: Optional[str]) -
 
 
 _SHARED_LOCK = threading.Lock()
+_SESSION_STATE_LOCK = threading.Lock()
 
 
 def state_agents_add(project_root: Path, task_id: str, agent: Optional[str]) -> None:
@@ -892,6 +950,119 @@ def state_agents_remove(project_root: Path, task_id: str, agent: Optional[str]) 
         if agent in running:
             running.remove(agent)
         write_state_minimal(project_root, {"running_agents": running})
+
+
+def _iso_now() -> str:
+    return datetime.now().astimezone().replace(microsecond=0).isoformat()
+
+
+def watcher_state_path(project_root: Path) -> Path:
+    return project_root / ".opencode" / "state" / "watcher-state.yaml"
+
+
+def _new_watcher_state(task_id: str) -> dict:
+    return {"task_id": task_id, "sessions": {}}
+
+
+def read_watcher_state(project_root: Path, task_id: str) -> dict:
+    """Lit .opencode/state/watcher-state.yaml ; réinitialise si la tâche change."""
+    path = watcher_state_path(project_root)
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return _new_watcher_state(task_id)
+    try:
+        data, err = parse_workflow_minimal(path)
+    except Exception:
+        return _new_watcher_state(task_id)
+    if err or not isinstance(data, dict):
+        return _new_watcher_state(task_id)
+    watcher = data.get("watcher")
+    if not isinstance(watcher, dict) or str(watcher.get("task_id")) != task_id:
+        return _new_watcher_state(task_id)
+    sessions = watcher.get("sessions")
+    if not isinstance(sessions, dict):
+        sessions = {}
+    return {"task_id": task_id, "sessions": sessions}
+
+
+def write_watcher_state(project_root: Path, state: dict) -> bool:
+    path = watcher_state_path(project_root)
+    try:
+        os.makedirs(str(path.parent), exist_ok=True)
+    except OSError:
+        return False
+    sessions = state.get("sessions") if isinstance(state.get("sessions"), dict) else {}
+    lines = ["watcher:"]
+    lines.append("  task_id: " + _qscalar(state.get("task_id")))
+    lines.append("  sessions:")
+    for agent in sorted(sessions):
+        entry = sessions.get(agent)
+        entry = entry if isinstance(entry, dict) else {}
+        lines.append("    " + _qscalar(agent) + ":")
+        lines.append("      session_id: " + _qscalar(entry.get("session_id")))
+        lines.append("      created_at: " + _qscalar(entry.get("created_at")))
+        lines.append("      last_usage_pct: " + _qscalar(entry.get("last_usage_pct")))
+        lines.append("      last_checked: " + _qscalar(entry.get("last_checked")))
+        lines.append("      rotation_pending: "
+                     + ("true" if entry.get("rotation_pending") is True else "false"))
+        lines.append("      last_time_compacting: " + _qscalar(entry.get("last_time_compacting")))
+    try:
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    except OSError:
+        return False
+    return True
+
+
+def session_max_usage(project_root: Path) -> int:
+    """Seuil de rotation (%) depuis .opencode/sayrhazi.yaml (session.max_usage, défaut 85)."""
+    config = project_root / ".opencode" / "sayrhazi.yaml"
+    try:
+        text = config.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return 85
+    in_session = False
+    for raw in text.splitlines():
+        line = raw.rstrip()
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        indent = len(line) - len(line.lstrip(" "))
+        if indent == 0 and stripped == "session:":
+            in_session = True
+            continue
+        if in_session:
+            if indent == 0:
+                break
+            match = re.match(r"^\s*max_usage\s*:\s*(\d+)\s*$", line)
+            if match:
+                try:
+                    value = int(match.group(1))
+                    return max(1, min(100, value))
+                except ValueError:
+                    pass
+    return 85
+
+
+def session_usage_ratio(project_root: Path, db_path, session_id: str):
+    """(pct, tokens, limit, model_key) du dernier message assistant d'une session.
+
+    Les tokens viennent d'OpenCode (message_context_tokens : input + output +
+    reasoning + cache.read + cache.write) ; la fenêtre est le registre statique
+    de Sayrhazi (load_model_limits). Aucun pourcentage n'est estimé.
+    """
+    if (last_assistant_message is None or message_context_tokens is None
+            or load_model_limits is None or message_model_key is None):
+        return (None, None, None, "")
+    payload = last_assistant_message(db_path, session_id)
+    if payload is None:
+        return (None, None, None, "")
+    tokens = message_context_tokens(payload)
+    model_key = message_model_key(payload) or ""
+    limits = load_model_limits(project_root) or {}
+    limit = limits.get(model_key)
+    pct = (tokens / limit) if (isinstance(limit, int) and limit > 0) else None
+    return (pct, tokens, limit, model_key)
 
 
 def max_parallel_agents(config: Optional[dict]) -> int:
@@ -1025,15 +1196,22 @@ def check_opencode_available() -> bool:
         return False
 
 
-def build_command(agent_file: str, prompt: str, title: str, model: str) -> list:
-    """Commande `opencode run` : agent + titre unique + modèle forcé.
+def build_command(agent_file: str, prompt: str, title: str, model: str,
+                  session_id: Optional[str] = None) -> list:
+    """Commande `opencode run` : agent, titre unique ou session réutilisée, modèle.
 
-    Aucun `--session` : chaque appel ouvre une session neuve et laisse
-    OpenCode gérer son contexte (compaction, cache) sans interférence. Le
-    modèle du frontmatter est la source de vérité : changer de modèle =
-    éditer la fiche de l'agent, jamais un paramètre d'exécution.
+    Quand `session_id` est donné, l'appel réutilise cette session OpenCode
+    (`--session`) et conserve son contexte ; sinon une session neuve est
+    ouverte et titrée de façon déterministe
+    (`Sayrhazi <task_id> <agent> <run_id>`). Le modèle du frontmatter
+    reste la source de vérité : changer de modèle impose d'éditer la fiche
+    de l'agent, jamais un paramètre d'exécution.
     """
-    cmd = ["opencode", "run", "--agent", agent_file, "--title", title]
+    cmd = ["opencode", "run", "--agent", agent_file]
+    if session_id:
+        cmd += ["--session", session_id]
+    else:
+        cmd += ["--title", title]
     if model:
         cmd += ["--model", model]
     return cmd + [prompt]
@@ -1061,6 +1239,43 @@ def trigger_stage(project_root: Path, stage: dict, task_id: str) -> Tuple[bool, 
     trigger = stage.get("trigger") or {}
     prompt = AGENT_PROMPTS.get(agent, "Sayrhazi task {task} : avance l'étape " + str(stage.get("id", "?")))
     prompt = prompt.format(task=task_id) + " " + isolation_clause(agent)
+
+    # Décision de session OpenCode (rotation des sessions) : prise avant
+    # l'appel, jamais pendant l'exécution de l'agent.
+    db_path = opencode_db_path() if opencode_db_path else None
+    session_id_to_use: Optional[str] = None
+    rotation_applied = False
+    stored_compacting = None
+    prefix = f"Sayrhazi {task_id} {agent_file} "
+    try:
+        watcher = read_watcher_state(project_root, task_id)
+        sessions = watcher.get("sessions") if isinstance(watcher.get("sessions"), dict) else {}
+        stored = sessions.get(agent_file)
+        stored = stored if isinstance(stored, dict) else {}
+        stored_sid = str(stored.get("session_id") or "")
+        stored_compacting = stored.get("last_time_compacting") or None
+        rotate = False
+        if db_path is None or last_assistant_message is None:
+            # Information indisponible : rotation conservatrice, pas d'estimation.
+            log(f"{agent_file} : usage OpenCode indisponible - rotation conservatrice ({task_id})")
+            rotate = True
+        elif stored.get("rotation_pending") is True:
+            rotate = True
+        elif stored_sid:
+            pct, _tokens, _limit, _model_key = session_usage_ratio(project_root, db_path, stored_sid)
+            max_usage = session_max_usage(project_root)
+            if pct is not None and pct >= max_usage / 100.0:
+                rotate = True
+            else:
+                current_compacting = (session_time_compacting(db_path, stored_sid)
+                                      if session_time_compacting else None)
+                if (stored_compacting is not None and current_compacting is not None
+                        and current_compacting != stored_compacting):
+                    rotate = True
+        session_id_to_use = None if rotate else (stored_sid or None)
+        rotation_applied = rotate
+    except Exception as exc:  # garde-fou : la décision de session ne bloque jamais l'appel
+        log(f"ATTENTION : décision de session ignorée ({exc})")
     full_model, model_short = agent_model(project_root, agent_file)
     start = time.time()
     run_id = build_run_id(start)
@@ -1082,7 +1297,8 @@ def trigger_stage(project_root: Path, stage: dict, task_id: str) -> Tuple[bool, 
     ticker.start()
 
     def _invoke():
-        parts = build_command(agent_file, prompt, title, full_model)
+        parts = build_command(agent_file, prompt, title, full_model,
+                              session_id=session_id_to_use)
         if IS_WINDOWS:
             command_str = " ".join(f'"{p}"' if " " in p else p for p in parts)
             return subprocess.run(command_str, cwd=str(project_root), capture_output=True, text=True, shell=True, timeout=600, encoding="utf-8", errors="replace")
@@ -1111,6 +1327,53 @@ def trigger_stage(project_root: Path, stage: dict, task_id: str) -> Tuple[bool, 
         return False, "other"
     stop_tick.set()
     ticker.join()
+
+    # Mise à jour de l'état de session après l'appel (dernière session connue,
+    # usage mesuré, rotation en attente). Ne fait jamais échouer l'appel.
+    try:
+        final_sid = session_id_to_use
+        if final_sid is None and db_path is not None and find_sessions is not None:
+            found = find_sessions(db_path, str(project_root), agent_file, prefix)
+            matches = [str(s.get("id")) for s in (found or [])
+                       if str(s.get("title") or "") == title]
+            if matches:
+                final_sid = matches[0]
+            else:
+                auto = latest_auto_session(found or [])
+                final_sid = str(auto.get("id")) if auto else None
+        watcher = read_watcher_state(project_root, task_id)
+        sessions = watcher.get("sessions") if isinstance(watcher.get("sessions"), dict) else {}
+        entry = sessions.get(agent_file)
+        entry = entry if isinstance(entry, dict) else {}
+        reuse = bool(final_sid) and entry.get("session_id") == final_sid
+        pct = tokens = None
+        if db_path is not None and final_sid is not None:
+            pct, tokens, _limit, _model_key = session_usage_ratio(project_root, db_path, final_sid)
+        compacting_now = (session_time_compacting(db_path, final_sid)
+                          if (db_path is not None and final_sid is not None
+                              and session_time_compacting is not None)
+                          else None)
+        rotation_pending = False
+        if not rotation_applied:
+            max_usage = session_max_usage(project_root)
+            if pct is not None and pct >= max_usage / 100.0:
+                rotation_pending = True
+            if (compacting_now is not None and stored_compacting is not None
+                    and compacting_now != stored_compacting):
+                rotation_pending = True
+        sessions[agent_file] = {
+            "session_id": final_sid,
+            "created_at": entry.get("created_at") if reuse else _iso_now(),
+            "last_usage_pct": (f"{pct * 100:.0f} %" if pct is not None else "-"),
+            "last_checked": _iso_now(),
+            "rotation_pending": rotation_pending,
+            "last_time_compacting": compacting_now,
+        }
+        watcher["sessions"] = sessions
+        with _SESSION_STATE_LOCK:
+            write_watcher_state(project_root, watcher)
+    except Exception as exc:  # garde-fou : l'état de session ne bloque jamais l'appel
+        log(f"ATTENTION : mise à jour watcher-state ignorée ({exc})")
     if result.stdout:
         print()
         log(f"============ AGENT · {agent_file} ============")
@@ -1143,33 +1406,33 @@ def trigger_stage(project_root: Path, stage: dict, task_id: str) -> Tuple[bool, 
 
 
 def trigger_agent(project_root: Path, task_id: str) -> bool:
-    """Chemin historique build.txt TERMINÉ -> Hadji (repli sans config)."""
+    """Chemin historique backend.txt TERMINÉ -> Hadji (repli sans config)."""
     ok, _kind = trigger_stage(project_root, {"id": "review", "agent": "reviewer",
-                                             "trigger": {"report": "build.txt", "status": "TERMINÉ"}},
+                                             "trigger": {"report": "backend.txt", "status": "TERMINÉ"}},
                               task_id)
     return ok
 
 
-def should_trigger(build_file: Path, last_trigger: str) -> Tuple[bool, str, Optional[str]]:
+def should_trigger(report_file: Path, last_trigger: str) -> Tuple[bool, str, Optional[str]]:
     """Retourne (déclencher?, clé_unique, raison)."""
-    current_hash = file_hash(build_file)
+    current_hash = file_hash(report_file)
     if current_hash is None:
-        return False, last_trigger, "build.txt absent"
+        return False, last_trigger, "backend.txt absent"
     # Stabilité : relire après debounce
     time.sleep(DEBOUNCE_SECONDS)
-    stable_hash = file_hash(build_file)
+    stable_hash = file_hash(report_file)
     if stable_hash != current_hash:
         return False, last_trigger, "fichier instable (écriture en cours)"
-    task_id, status = parse_build_report(build_file)
+    task_id, status = parse_backend_report(report_file)
     if not task_id:
         return False, last_trigger, "task_id absent - rapport incomplet, refusé"
     if status != "TERMINÉ":
         return False, last_trigger, f"status={status or 'absent'} - attendu TERMINÉ, refusé"
-    # Point 7 du contrat : un review.txt plus récent que build.txt et mentionnant
+    # Point 7 du contrat : un review.txt plus récent que backend.txt et mentionnant
     # le même task_id prouve que Hadji a déjà traité cette version (même après
     # redémarrage du watcher, où l'anti-double en mémoire est perdu). Un nouveau
     # build de Bamse (mtime plus récent) relance légitimement la transition.
-    review_file = build_file.parent / "review.txt"
+    review_file = report_file.parent / "review.txt"
     if review_file.is_file():
         try:
             review_text = review_file.read_text(encoding="utf-8", errors="replace")
@@ -1177,7 +1440,7 @@ def should_trigger(build_file: Path, last_trigger: str) -> Tuple[bool, str, Opti
             review_text = ""
         if task_id in review_text:
             try:
-                if review_file.stat().st_mtime >= build_file.stat().st_mtime:
+                if review_file.stat().st_mtime >= report_file.stat().st_mtime:
                     return False, last_trigger, f"review.txt existe déjà pour {task_id} - déjà traité"
             except OSError:
                 pass
@@ -1188,7 +1451,7 @@ def should_trigger(build_file: Path, last_trigger: str) -> Tuple[bool, str, Opti
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Moteur de transitions Sayrhazi (workflow.yaml, repli build.txt -> Hadji)")
+    parser = argparse.ArgumentParser(description="Moteur de transitions Sayrhazi (workflow.yaml, repli backend.txt -> Hadji)")
     parser.add_argument("--once", action="store_true", help="une seule vérification")
     parser.add_argument("--check", action="store_true", help="valide config sans surveiller")
     parser.add_argument("--timeout", type=int, default=0, help="durée max en secondes (0=infini)")
@@ -1201,18 +1464,18 @@ def main() -> int:
         log("ERREUR : racine projet introuvable (.opencode/sayrhazi.yaml absent). Lance depuis le projet.")
         return 2
     log(f"Racine du projet : {root}")
-    build_file = root / ".opencode" / "resume" / "build.txt"
+    report_file = root / ".opencode" / "resume" / "backend.txt"
 
     if not (root / ".opencode" / "sayrhazi.yaml").is_file():
         log("ERREUR : .opencode/sayrhazi.yaml absent.")
         return 2
     if args.check:
         ok = check_opencode_available()
-        task_id, status = parse_build_report(build_file) if build_file.is_file() else (None, None)
-        log(f"check: build.txt task_id={task_id} status={status}")
+        task_id, status = parse_backend_report(report_file) if report_file.is_file() else (None, None)
+        log(f"check: backend.txt task_id={task_id} status={status}")
         config, werr = parse_workflow_minimal(root / ".opencode" / "workflow.yaml")
         if werr or config is None:
-            log(f"check: workflow.yaml inutilisable ({werr or 'absent'}) : repli build.txt -> Hadji")
+            log(f"check: workflow.yaml inutilisable ({werr or 'absent'}) : repli backend.txt -> Hadji")
         else:
             usable, notes = select_auto_stages(config)
             for note in notes:
@@ -1239,8 +1502,8 @@ def main() -> int:
         usable, notes = select_auto_stages(config) if config else ([], [werr or "absent"])
         if not usable:
             if notes:
-                log(f"ATTENTION : workflow.yaml inutilisable ({notes[0]}) : repli build.txt -> Hadji.")
-            return run_legacy(root, args, build_file)
+                log(f"ATTENTION : workflow.yaml inutilisable ({notes[0]}) : repli backend.txt -> Hadji.")
+            return run_legacy(root, args, report_file)
         for note in notes:
             log(f"ATTENTION : {note}")
         log(f"Workflow : {len(usable)} étape(s) automatique(s) : "
@@ -1399,20 +1662,20 @@ def run_generic(root: Path, args, config: Optional[dict], usable: list) -> int:
         return 0
 
 
-def run_legacy(root: Path, args, build_file: Path) -> int:
-    """Chemin historique build.txt TERMINÉ -> Hadji (sans config)."""
+def run_legacy(root: Path, args, report_file: Path) -> int:
+    """Chemin historique backend.txt TERMINÉ -> Hadji (sans config)."""
     if getattr(args, "cont", False):
         diagnose_restart(root)
-    log(f"Surveillance de : {build_file}")
+    log(f"Surveillance de : {report_file}")
     last_trigger = ""
     last_touch = time.time()
     start = time.time()
 
     def one_pass() -> bool:
         nonlocal last_trigger
-        trigger, key, reason = should_trigger(build_file, last_trigger)
+        trigger, key, reason = should_trigger(report_file, last_trigger)
         log(f"État : {reason}")
-        if trigger and trigger_agent(root, parse_build_report(build_file)[0] or "UNKNOWN"):
+        if trigger and trigger_agent(root, parse_backend_report(report_file)[0] or "UNKNOWN"):
             last_trigger = key
             return True
         if trigger:
@@ -1429,7 +1692,7 @@ def run_legacy(root: Path, args, build_file: Path) -> int:
             if args.timeout and (time.time() - start) > args.timeout:
                 log("Timeout atteint, arrêt.")
                 return 1
-            current = file_hash(build_file)
+            current = file_hash(report_file)
             if current != last_hash_seen:
                 last_hash_seen = current
                 if one_pass():

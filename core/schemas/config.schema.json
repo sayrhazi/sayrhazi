@@ -95,7 +95,7 @@
     },
     "session": {
       "type": "object",
-      "description": "Obsolete depuis 0.13.0 : le watcher ne suit plus l'usage des sessions (session neuve par appel, OpenCode gere le contexte). Accepte pour ne pas casser les configs existantes ; sans effet.",
+      "description": "Politique de rotation des sessions du watcher : OpenCode fournit les donnees brutes du contexte (tokens, fenetre, compaction) ; Sayrhazi applique son propre seuil de rotation avec session.max_usage. Optionnel.",
       "properties": {
         "max_usage": {"type": "number"},
         "default_limit": {"type": "integer"}

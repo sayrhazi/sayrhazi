@@ -17,7 +17,7 @@ Rédige toujours tes réponses et rapports en français, sauf demande contraire 
 
 Lis `.opencode/sayrhazi.yaml`, `AGENTS.md` et le rapport de l'étape implémentation :
 - scope `frontend` : `.opencode/resume/frontend.txt` (agent `frontend`) ;
-- scope `backend` ou classique : `.opencode/resume/build.txt` (agent `build-back`) ;
+- scope `backend` ou classique : `.opencode/resume/backend.txt` (agent `build-back`) ;
 - scope `fullstack` : `.opencode/resume/fullstack.txt` (sections frontend d'Ali et backend de Bamse).
 
 Le plan (`plan.txt`) indique les contrôles QA requis : après Ali (interface testable indépendamment du backend) et/ou après Bamse (parcours intégré frontend→backend). On ne déclenche pas un test inutile avant que son objet soit testable.

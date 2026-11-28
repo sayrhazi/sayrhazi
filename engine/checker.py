@@ -149,7 +149,7 @@ def main() -> int:
         from fullstack import read_fullstack, validate_fullstack
         resume_dir = opencode / "resume"
         if resume_dir.is_dir():
-            for name in ("plan.txt", "design.txt", "build.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt"):
+            for name in ("plan.txt", "review.txt", "security.txt", "qa.txt", "frontend.txt", "backend.txt"):
                 p = resume_dir / name
                 if not p.is_file():
                     continue

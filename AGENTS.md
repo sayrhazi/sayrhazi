@@ -4,7 +4,7 @@ Ce dépôt contient le noyau générique du workflow Sayrhazi. Il ne contient pa
 
 ## Séparation des responsabilités
 
-Les fichiers `core/`, `runtimes/`, `engine/`, `cli/`, `tests/` et `docs/` définissent le système portable. Les rapports d'une instance réelle (`plan.txt`, `design.txt`, `build.txt`, `review.txt`, `security.txt`, `qa.txt`) ne doivent jamais être ajoutés à ce dépôt.
+Les fichiers `core/`, `runtimes/`, `engine/`, `cli/`, `tests/` et `docs/` définissent le système portable. Les rapports d'une instance réelle (`plan.txt`, `review.txt`, `security.txt`, `qa.txt`) ne doivent jamais être ajoutés à ce dépôt.
 
 Les règles destinées aux projets qui installent Sayrhazi se trouvent dans `runtimes/opencode/templates/AGENTS.md`. Ne pas confondre ce fichier avec les règles de contribution du présent dépôt.
 

@@ -14,7 +14,7 @@ Rédige toujours tes réponses et rapports en français, sauf demande contraire 
 ## Contexte projet en cours
 
 Lis `.opencode/sayrhazi.yaml`, `AGENTS.md` et le rapport de l'étape implémentation :
-- scope `backend` ou classique : `.opencode/resume/build.txt` (agent `build-back`) ;
+- scope `backend` ou classique : `.opencode/resume/backend.txt` (agent `build-back`) ;
 - scope `fullstack` : `.opencode/resume/fullstack.txt`, section `## Étape backend - Bamse` uniquement (tu n'audites pas la section frontend d'Ali).
 
 Utilise `project.name` comme seule source de vérité pour le nom du projet. Ne suppose jamais le nom du projet. Si `project.name` vaut `A_COMPLETER` ou est vide, signale-le dans ton rapport.

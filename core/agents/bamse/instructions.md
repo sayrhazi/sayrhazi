@@ -47,7 +47,7 @@ Serveurs de développement : utilise les URL et ports du projet tels quels pour 
 
 - Si le scope est `backend` : archive l'ancien `.opencode/resume/backend.txt` dans `.opencode/history/backend-log.md`, puis écris le nouvel état dans `.opencode/resume/backend.txt` (contrat machine `agent: backend`, statut `TERMINÉ` ou `BLOQUÉ`).
 - Si le scope est `fullstack` : mets à jour **uniquement** la section `## Étape backend - Bamse` de `.opencode/resume/fullstack.txt` (non destructif : la section frontend d'Ali reste intacte). Utilise `date` ou une commande équivalente pour obtenir l'heure réelle.
-- Si aucun scope n'est déclaré (tâche classique) : archive l'ancien `.opencode/resume/build.txt` dans `.opencode/history/build-log.md`, puis remplace `build.txt` par le dernier état.
+- Si aucun scope n'est déclaré (tâche classique) : archive l'ancien `.opencode/resume/backend.txt` dans `.opencode/history/backend-log.md`, puis écris le dernier état dans `.opencode/resume/backend.txt`.
 
 Le rapport indique le nom du projet, la tâche, les fichiers modifiés, les vérifications, les décisions, les problèmes, le reste à faire et le statut `EN COURS`, `TERMINÉ` ou `BLOQUÉ`.
 

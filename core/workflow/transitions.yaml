@@ -1,5 +1,5 @@
 # Transitions automatisables (moteur supervise).
-# Seule build.txt TERMINÉ + task_id -> reviewer est implementee (watcher).
+# Seule backend.txt TERMINÉ + task_id -> reviewer est implementée (watcher).
 transitions:
   - from: plan.txt
     status: À IMPLÉMENTER

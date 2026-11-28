@@ -581,6 +581,17 @@ class TestWorkflow(unittest.TestCase):
         tmpl = self._load("runtimes/opencode/templates/workflow.yaml")
         self.assertEqual(tmpl, ref)
 
+    def test_template_sans_artefacts_historiques(self):
+        text = (ROOT / "runtimes" / "opencode" / "templates" / "workflow.yaml").read_text(
+            encoding="utf-8")
+        data = self._load("runtimes/opencode/templates/workflow.yaml")
+        self.assertEqual([s["id"] for s in data["stages"]],
+                         ["buildback", "buildfront", "review", "security",
+                          "visual_qa", "rework", "rework_qa"])
+        self.assertEqual(text.count("report: backend.txt"), 3)
+        for obsolete in ("build.txt", "design.txt", "id: implementation", "agent: builder"):
+            self.assertNotIn(obsolete, text)
+
     def test_invalides(self):
         from workflow import parse_workflow, validate_workflow
         base = ("workflow:\n  mode: supervised\n  auto_start: false\n  max_parallel_agents: 3\n"
@@ -1244,16 +1255,24 @@ class TestSession(unittest.TestCase):
         limites = t.load_model_limits(ROOT)
         self.assertTrue(limites, "registre core/runtime/models.yaml vide ou introuvable")
         attendus = {
-            "opencode/inkling-2-small-free": 1048576,
-            "opencode/longcat-2.5-preview-free": 1000000,
-            "opencode/muse-spark-1.3-contributor-free": 1048576,
-            "opencode/nemotron-3-ultra-free": 1000000,
+            "opencode/tidepool-alpha-free": 1048576,
+            "opencode/hy4-flash-free": 1048576,
+            "opencode/iceman-free": 262144,
+            "opencode/flint-40b-free": 262144,
+            "opencode/deepseek-v4.1-flash-free": 200000,
             "opencode/nemotron-3.5-super-vl-free": 1048576,
-            "opencode/space-bunny-free": 1048576,
-            "opencode/step-5-preview-free": 1000000,
+            "opencode/beam-free": 1048576,
+            "opencode/mimo-v2.6-flash-free": 200000,
+            "opencode/nemotron-3.5-lightning-free": 262144,
+            "opencode/big-pickle": 200000,
         }
         for cle, valeur in attendus.items():
             self.assertEqual(limites.get(cle), valeur, cle)
+        texte = (ROOT / "core" / "runtime" / "models.yaml").read_text(encoding="utf-8")
+        self.assertTrue(texte.startswith("# Registre des fenêtres de contexte"))
+        self.assertLess(texte.index("models:"), texte.index("opencode/tidepool-alpha-free"))
+        for obsolete in ("inkling-2-small-free", "longcat-2.5-preview-free", "muse-spark-1.3-contributor-free"):
+            self.assertNotIn(obsolete, texte)
         # Modele absent du registre : pas de limite inventee.
         self.assertIsNone(limites.get("inconnu/inexistant"))
 
@@ -2129,7 +2148,7 @@ class TestInstallerCopieLesFichiersDuDashboard(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             projet = Path(tmp)
-            rapport = projet / ".opencode" / "resume" / "build.txt"
+            rapport = projet / ".opencode" / "resume" / "backend.txt"
             rapport.parent.mkdir(parents=True)
             rapport.write_text("contenu a preserver\n", encoding="utf-8")
             historique = projet / ".opencode" / "history" / "log.md"

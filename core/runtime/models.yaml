@@ -1,69 +1,56 @@
 # Registre des fenêtres de contexte (lecture seule, observé par le dashboard).
 #
-# Ceci est un relevé ponctuel, PAS un catalogue officiel. Les modèles listés
-# étaient observés via OpenCode au `verified_at` indiqué ; un fournisseur
-# peut les retirer, les mettre derrière une formule payante ou en changer la
-# fenêtre du jour au lendemain (constaté : des modèles apparaissent et
-# disparaissent d'une semaine à l'autre). Une ligne ici ne dit rien de la
-# disponibilité future d'un modèle, ni de son prix : ne jamais en déduire
-# qu'un modèle est gratuit parce qu'il figure dans ce fichier.
+# Pourquoi ce fichier : OpenCode n'enregistre nulle part la taille de la
+# fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration), mais
+# son panneau Context en a besoin pour afficher son pourcentage. Sayrhazi
+# reproduit ce calcul : sans limite connue, il n'affiche aucun pourcentage
+# plutôt qu'un chiffre faux — les tokens et le coût restent affichés.
 #
-# Ce fichier est la référence à consulter pour savoir quels modèles ont
-# été observés comme disponibles (y compris gratuits) au moment du relevé.
-# Le dashboard y lit les fenêtres de contexte pour calculer le pourcentage
-# d'occupation ; sans entrée connue il affiche `n/d` plutôt qu'un chiffre
-# inventé (tokens et coût restent affichés).
+# Clé = identifiant complet `provider/model` (jamais le seul nom du modèle :
+# deux fournisseurs peuvent proposer des variantes homonymes de limites
+# différentes). Commenter/ignorer une clé est sans effet.
 #
-# Clé = identifiant complet `provider/model` (jamais le seul nom : deux
-# fournisseurs peuvent proposer des variantes homonymes de limites
-# différentes).
-#
-# Entretien :
-#   * nouveau modèle observé -> ajouter son ID, son contexte et sa source ;
-#   * fenêtre modifiée -> corriger `context_tokens` et `verified_at` ;
-#   * modèle retiré du catalogue OpenCode -> la ligne peut rester (inerte)
-#     ou être supprimée ; aucune suppression automatique n'est faite.
-#
-# Choix du modèle par agent :
-#   * Les agents livrés par le noyau utilisent par défaut `opencode/big-pickle`
-#     (200 000 tokens de contexte).
-#   * L'utilisateur peut choisir un autre modèle pour chaque agent dans le
-#     frontmatter de `.opencode/agent/<agent>.md` (`model: provider/model`),
-#     ou via `sayrhazi.yaml`. Le watcher passe toujours ce modèle en `--model` :
-#     la fiche du projet est la seule source de vérité.
-#   * `core/runtime/models.yaml` n'écrase jamais le choix de l'utilisateur :
-#     il sert uniquement de référence pour les fenêtres de contexte.
+# Entretien : ajouter une entrée quand un nouveau modèle apparaît. Le
+# `source` et le `verified_at` servent à tracer d'où vient la valeur.
 
 models:
-  opencode/big-pickle:
+  opencode/tidepool-alpha-free:
+    context_tokens: 1048576
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/hy4-flash-free:
+    context_tokens: 1048576
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/iceman-free:
+    context_tokens: 262144
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/flint-40b-free:
+    context_tokens: 262144
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/deepseek-v4.1-flash-free:
     context_tokens: 200000
-    source: releve manuel via opencode
-    verified_at: "2026-11-20"
-  opencode/inkling-2-small-free:
-    context_tokens: 1048576
-    source: releve manuel via opencode
-    verified_at: "2026-11-12"
-  opencode/longcat-2.5-preview-free:
-    context_tokens: 1000000
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
-  opencode/muse-spark-1.3-contributor-free:
-    context_tokens: 1048576
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
-  opencode/nemotron-3-ultra-free:
-    context_tokens: 1000000
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
   opencode/nemotron-3.5-super-vl-free:
     context_tokens: 1048576
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
-  opencode/space-bunny-free:
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/beam-free:
     context_tokens: 1048576
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
-  opencode/step-5-preview-free:
-    context_tokens: 1000000
-    source: releve manuel via opencode
-    verified_at: "2026-10-15"
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/mimo-v2.6-flash-free:
+    context_tokens: 200000
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/nemotron-3.5-lightning-free:
+    context_tokens: 262144
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"
+  opencode/big-pickle:
+    context_tokens: 200000
+    source: relevé automatique par Sayrhazi via OpenCode (/config/providers)
+    verified_at: "2026-11-23"

@@ -239,7 +239,7 @@ def reconcile(project_root: Path | str, task_id: str | None = None) -> tuple[dic
     completed: list[str] = []
     pending: list[str] = []
     blocked: list[str] = []
-    build_ok = "build.txt" in valid or "backend.txt" in valid
+    backend_ok = "backend.txt" in valid
     for sid in stages:
         rep = STAGE_REPORTS.get(sid)
         data = valid.get(rep) if rep else None
@@ -248,9 +248,9 @@ def reconcile(project_root: Path | str, task_id: str | None = None) -> tuple[dic
             continue
         status = normalize_status(data.get("status", ""))
         role = REPORT_ROLES.get(rep or "")
-        if sid in ("review", "security", "visual_qa") and not build_ok:
+        if sid in ("review", "security", "visual_qa") and not backend_ok:
             blocked.append(sid)
-            notes.append(f"{sid} bloquée : {rep} sans build.txt valide")
+            notes.append(f"{sid} bloquée : {rep} sans backend.txt valide")
             continue
         if status == "BLOQUÉ":
             blocked.append(sid)

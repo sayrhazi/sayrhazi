@@ -1041,6 +1041,22 @@ _PROVIDER_CATALOG_TTL = 60.0
 # Tri canonique des variantes (minimum -> maximum) ; variantes hors liste à la fin, alphabetiquement.
 _REASONING_SCALE = ["minimal", "low", "medium", "high", "max", "xhigh", "none"]
 
+MODELS_REGISTRY_HEADER = """# Registre des fenêtres de contexte (lecture seule, observé par le dashboard).
+#
+# Pourquoi ce fichier : OpenCode n'enregistre nulle part la taille de la
+# fenêtre de contexte d'un modèle (ni en base, ni dans sa configuration), mais
+# son panneau Context en a besoin pour afficher son pourcentage. Sayrhazi
+# reproduit ce calcul : sans limite connue, il n'affiche aucun pourcentage
+# plutôt qu'un chiffre faux — les tokens et le coût restent affichés.
+#
+# Clé = identifiant complet `provider/model` (jamais le seul nom du modèle :
+# deux fournisseurs peuvent proposer des variantes homonymes de limites
+# différentes). Commenter/ignorer une clé est sans effet.
+#
+# Entretien : ajouter une entrée quand un nouveau modèle apparaît. Le
+# `source` et le `verified_at` servent à tracer d'où vient la valeur.
+"""
+
 def _variant_sort_key(v: str):
     v = str(v).lower()
     return (0, _REASONING_SCALE.index(v), "") if v in _REASONING_SCALE else (1, 0, v)
@@ -1117,6 +1133,133 @@ def _provider_catalog() -> list:
     _PROVIDER_CATALOG_CACHE = out
     _PROVIDER_CATALOG_AT = now
     return out
+
+
+def _parse_models_registry_file(path: Path) -> dict:
+    """Parse `models:` d'un fichier registre (miroir du chargeur
+    `load_model_limits` : cle aux 2e indent, context/source/verified_at au 4e).
+    Retourne {cle: {"context_tokens": int|None, "source": str, "verified_at": str}}.
+    """
+    entries: dict = {}
+    if not path.is_file():
+        return entries
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return entries
+    current: Optional[str] = None
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].rstrip() if not raw.strip().startswith("#") else ""
+        if not line.strip():
+            continue
+        match = re.match(r"^\s{2}(\S+):\s*$", line)
+        if match:
+            current = match.group(1).strip().strip('"').strip("'")
+            entries.setdefault(current, {})
+            continue
+        if current is None:
+            continue
+        match = re.match(r"^\s+(context_tokens|source|verified_at)\s*:\s*(.*)$", line)
+        if not match:
+            continue
+        key, value = match.group(1), match.group(2).strip().strip('"').strip("'")
+        if key == "context_tokens":
+            try:
+                value = int(value)
+            except (TypeError, ValueError):
+                value = 0
+        entries[current][key] = value
+    return entries
+
+
+def sync_models_registry(root: Path, attempts: int = 3) -> int:
+    """Aligne .opencode/models.yaml sur le catalogue OpenCode actuel.
+
+    Le registre ne contient que les modèles actuellement exposés par OpenCode
+    et pourvus d'une fenêtre de contexte. L'en-tête et l'ordre Opencode FREE
+    sont reproduits à chaque écriture ; les entrées absentes du catalogue sont
+    supprimées. `source` et `verified_at` des entrées présentes sont conservés.
+    """
+    global _PROVIDER_CATALOG_CACHE
+    catalog = None
+    for _ in range(attempts):
+        _PROVIDER_CATALOG_CACHE = None
+        catalog = _provider_catalog()
+        if catalog:
+            break
+        time.sleep(1)
+    if not catalog:
+        return 0
+
+    path = root / ".opencode" / "models.yaml"
+    existing = _parse_models_registry_file(path)
+    today = time.strftime("%Y-%m-%d")
+    entries: dict = {}
+    metadata: dict = {}
+    changed = 0
+    for provider in catalog:
+        pid = str(provider.get("id") or "")
+        if not pid:
+            continue
+        provider_name = str(provider.get("name") or pid)
+        for m in provider.get("models") or []:
+            if not isinstance(m, dict):
+                continue
+            try:
+                context = int(m.get("context") or 0)
+            except (TypeError, ValueError):
+                context = 0
+            if context <= 0:
+                continue
+            key = f"{pid}/{str(m.get('id') or '')}"
+            metadata[key] = {
+                "free": bool(m.get("free")),
+                "name": str(m.get("name") or m.get("id") or key),
+                "provider": provider_name,
+                "release": int(m.get("releaseDate") or 0),
+            }
+            previous = existing.get(key)
+            entry = dict(previous) if isinstance(previous, dict) else {}
+            if entry.get("context_tokens") != context:
+                entry["context_tokens"] = context
+                entry["verified_at"] = today
+                changed += 1
+            entry.setdefault("source", "relevé automatique par Sayrhazi via OpenCode (/config/providers)")
+            entry.setdefault("verified_at", today)
+            entries[key] = entry
+
+    changed += len(set(existing) - set(entries))
+
+    lines = MODELS_REGISTRY_HEADER.splitlines() + ["", "models:"]
+    for key in sorted(entries, key=lambda value: (
+        0 if value.startswith("opencode/") and metadata[value]["free"] else 1,
+        0 if value.startswith("opencode/") else 1,
+        metadata[value]["provider"].lower(),
+        -metadata[value]["release"],
+        metadata[value]["name"].lower(),
+        value,
+    )):
+        entry = entries[key]
+        lines.append(f"  {key}:")
+        lines.append(f"    context_tokens: {int(entry['context_tokens'])}")
+        if entry.get("source"):
+            lines.append(f"    source: {entry['source']}")
+        if entry.get("verified_at"):
+            lines.append(f"    verified_at: \"{entry['verified_at']}\"")
+    desired = "\n".join(lines) + "\n"
+
+    try:
+        current = path.read_text(encoding="utf-8")
+    except OSError:
+        current = ""
+    if current == desired:
+        return changed
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(desired, encoding="utf-8")
+    except OSError:
+        return changed
+    return max(changed, 1)
 
 
 def _provider_name(provider_id: str) -> str:
@@ -2176,6 +2319,27 @@ class ServerHandler(_mod.Handler):
             self._send_json({"ok": False, "session_id": session_id,
                              "error": result.get("error") or result.get("raw")}, status=404 if sc == 404 else 500)
             return
+
+        # Usage du contexte (dernier message assistant), comme le tableau de bord.
+        usage_pct = None
+        usage_tokens = None
+        usage_limit = None
+        try:
+            db_path = opencode_db_path()
+            if db_path:
+                payload = last_assistant_message(db_path, session_id)
+                if payload:
+                    tokens = message_context_tokens(payload)
+                    model_key = message_model_key(payload)
+                    limits = load_model_limits(root)
+                    limit = limits.get(model_key) if isinstance(limits, dict) else None
+                    if isinstance(limit, int) and limit > 0 and tokens > 0:
+                        usage_pct = round(tokens / limit * 100, 1)
+                        usage_tokens = tokens
+                        usage_limit = limit
+        except Exception:
+            pass
+
         self._send_json({
             "ok": True,
             "session_id": str(result.get("id") or session_id),
@@ -2186,6 +2350,9 @@ class ServerHandler(_mod.Handler):
             "default_title": _is_default_session_title(str(result.get("title") or "")),
             "revert": result.get("revert") or None,
             "summary": result.get("summary") or None,
+            "usage_pct": usage_pct,
+            "usage_tokens": usage_tokens,
+            "usage_limit": usage_limit,
         })
 
     def _session_id_from_path(self) -> str:
@@ -3180,6 +3347,17 @@ def main() -> int:
     else:
         print("ATTENTION : OpenCode Server non disponible (opencode serve introuvable).")
         opencode_server = None
+
+    # Aligner .opencode/models.yaml sur le catalogue OpenCode actuel : au
+    # démarrage du serveur, OpenCode reste l'unique autorité sur les
+    # fenêtres de contexte fournies (toujours via sayrhazi-modules).
+    try:
+        if opencode_server is not None:
+            changed = sync_models_registry(root)
+            if changed:
+                print(f"Registre models.yaml : {changed} entrée(s) synchronisée(s) depuis OpenCode.")
+    except Exception as exc:
+        print(f"ATTENTION : sync models.yaml impossible : {exc}")
 
     print(f"Sayrhazi serveur - http://localhost:{args.port}/")
     print(f"Racine : {root}")
